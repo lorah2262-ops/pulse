@@ -751,7 +751,7 @@
 
   var B = { aimT: 0, aimY: 0, aimTT: 0, aimYT: 0, spin: 0, shake: 0, flash: 0, red: 0, dark: 0, light: 1, flick: 0, nextFlick: 0,
             knock: 0, slump: 0, blinkAt: 0, blinkTo: 0, glint: 0, parts: [], pops: [], dust: null, load: null, view: null,
-            sel: -1, steal: -1, stolen: -1, hurt: -1, glow: -1, glowTo: 0, beat: 0, cut: 0, dy: 0, fp: 0, recoil: 0 };
+            sel: -1, steal: -1, stolen: -1, hurt: -1, glow: -1, glowTo: 0, beat: 0, cut: 0, dy: 0, fp: 0, recoil: 0, self: 0 };
   var sc = $('scene'), cx = sc.getContext('2d'), wallC = null, feltC = null, SW = 176, OX = -12;   // the room is 200 wide; we see the middle 176
   function V() { return B.view || st; }
   function snap(s) { return { hp: s.hp.slice(), max: s.max, items: s.items.map(function (l) { return l.slice(); }), cuffed: s.cuffed.slice(), saw: s.saw, left: s.left }; }
@@ -933,7 +933,7 @@
   }
   function drawHands(v) {
     var opp = 1 - st.you, y = 45 + B.slump * 2;
-    if (!(B.fp === 0 && B.aimT > .5)) [70, 121].forEach(function (x, s) {
+    if (!(B.fp === 0 && B.aimT > .5) && !(!B.self && B.aimY > .6)) [70, 121].forEach(function (x, s) {
       px(x - 1, y - 2, 11, 3, '#0e0c0a');                                   // cuff
       px(x, y, 9, 3, '#4a4038'); px(x + 1, y, 7, 1, '#62564a');            // back of the hand
       for (var f = 0; f < 4; f++) { var fx = x + 1 + f * 2; px(fx, y + 3, 1, 2 + (f === 1 || f === 2 ? 1 : 0), '#4a4038'); px(fx, y + 5 + (f === 1 || f === 2 ? 1 : 0), 1, 1, '#2a231d'); }
@@ -1027,20 +1027,60 @@
     if (v.saw) ptext('X2', S.x - 34, Math.min(140, S.y - 46), 1, '#d9b34a');
     if (B.recoil) B.recoil *= .82;
   }
-  // staring down the barrel
+  function muzzleAt() { return B.self ? { x: 100, y: 78 } : { x: 100, y: FIG.hy + 24 }; }
+  // the gun turned on you: he holds it across the table, or your own hands turn it round
   function drawMuzzle() {
     if (B.aimY <= .55) return;
-    var k = ease((B.aimY - .55) / .45), R = 8 + k * 34, x = 100, y = 90 - k * 8;
-    cx.fillStyle = 'rgba(0,0,0,' + .5 * k + ')'; cx.fillRect(-20, -400, 240, 800);
-    function ring(cy, r, hole) {
-      cx.fillStyle = '#85858f'; circ(x - .8, cy - .8, r);
-      cx.fillStyle = '#34343c'; circ(x, cy, r - .6);
-      cx.fillStyle = '#1a1a1e'; circ(x, cy, r * (hole + .08));
-      cx.fillStyle = '#020202'; circ(x, cy, r * hole);
+    var k = ease((B.aimY - .55) / .45), now = performance.now(), self = B.self, hy = FIG.hy;
+    var sw = Math.sin(now / 610) * .8 * k, sw2 = Math.cos(now / 830) * .5 * k;
+    var M = self ? { x: 100 + sw, y: 150 - k * 72 + sw2 } : { x: 100 + (1 - k) * 4 + sw, y: 93 - k * (93 - hy - 24) + sw2 };
+    var R = self ? 4 + k * 7 : 3 + k * 6;
+    cx.fillStyle = 'rgba(0,0,0,' + .28 * k + ')'; cx.fillRect(-20, -400, 240, 800);
+    // the body of the gun going away from you, behind the muzzle
+    var E = self ? { x: 104, y: M.y + 46 } : { x: 116, y: hy + 15 };
+    function body(w0, w1, col, off) {
+      var dx = E.x - M.x, dy = E.y - M.y, L = Math.sqrt(dx * dx + dy * dy) || 1, nx = -dy / L, ny = dx / L;
+      cx.fillStyle = col; cx.beginPath();
+      cx.moveTo(M.x + nx * w0 + off * nx, M.y + ny * w0 + off * ny); cx.lineTo(E.x + nx * w1 + off * nx, E.y + ny * w1 + off * ny);
+      cx.lineTo(E.x - nx * w1 + off * nx, E.y - ny * w1 + off * ny); cx.lineTo(M.x - nx * w0 + off * nx, M.y - ny * w0 + off * ny); cx.closePath(); cx.fill();
     }
-    ring(y + R * 1.02, R * .58, .5);
-    ring(y, R, .64);
-    cx.fillStyle = 'rgba(255,255,255,.25)'; px(x - R * .55, y - R * .6, Math.max(1, R * .12), Math.max(1, R * .12), cx.fillStyle);
+    body(R * .9, R * .5, '#2a2a30', 0);
+    if (!self) {
+      // receiver and stock run back to his shoulder, lit along the top
+      body(R * .95, R * .75, '#2e2e35', 0); body(R * .2, R * .15, '#6e6e7a', -R * .8);
+      var mid = { x: M.x + (E.x - M.x) * .55, y: M.y + (E.y - M.y) * .55 };
+      cx.fillStyle = '#6e4528'; cx.beginPath(); cx.moveTo(mid.x, mid.y - 2); cx.lineTo(E.x + 3, E.y - 3); cx.lineTo(E.x + 4, E.y + 4); cx.lineTo(mid.x, mid.y + 3); cx.closePath(); cx.fill();
+      px(E.x + 1, E.y - 3, 3, 1, '#94603a');
+    }
+    // pump under the barrel, and the hands on it
+    var P = { x: M.x + (E.x - M.x) * .35, y: M.y + (E.y - M.y) * .35 + R * 1.1 };
+    cx.fillStyle = '#5e3a20'; circ(P.x, P.y, R * .75);
+    if (self) {
+      // your arms come up from the bottom to hold it
+      cx.fillStyle = '#16120e';
+      cx.beginPath(); cx.moveTo(P.x - R * 1.6, P.y); cx.lineTo(P.x - R * .2, P.y + R * .6); cx.lineTo(60, 170); cx.lineTo(30, 170); cx.closePath(); cx.fill();
+      cx.beginPath(); cx.moveTo(P.x + R * 1.6, P.y); cx.lineTo(P.x + R * .2, P.y + R * .6); cx.lineTo(140, 170); cx.lineTo(170, 170); cx.closePath(); cx.fill();
+      cx.fillStyle = '#6e5442'; circ(P.x - R * 1.15, P.y - R * .1, R * .7); circ(P.x + R * 1.15, P.y - R * .1, R * .7);
+      cx.fillStyle = '#8a6c56'; circ(P.x - R * 1.25, P.y - R * .35, R * .35); circ(P.x + R * 1.05, P.y - R * .35, R * .35);
+    } else {
+      // his sleeves, then his hands: one round the pump, one on the grip
+      px(P.x - R - 14, P.y - 1, 12, 5, '#0e0c0a'); px(E.x - 4, E.y + 3, 12, 5, '#0e0c0a');
+      px(P.x - R - 3, P.y - 2, R * 2 + 6, 5, '#5a4e44'); px(P.x - R - 3, P.y - 2, R * 2 + 6, 1, '#7a6c5e');
+      for (var f = 0; f < 4; f++) px(P.x - R - 1 + f * (R * 2 + 2) / 4, P.y + 3, 1, 1, '#2a231d');
+      px(E.x - 7, E.y + 1, 7, 5, '#5a4e44'); px(E.x - 7, E.y + 1, 7, 1, '#7a6c5e');
+    }
+    // the two openings looking at you: magazine tube below, barrel above
+    function ring(cy, r, hole) {
+      cx.fillStyle = '#8a8a94'; circ(M.x - .5, cy - .5, r);
+      cx.fillStyle = '#3a3a42'; circ(M.x, cy, r - Math.max(.6, r * .08));
+      cx.fillStyle = '#18181c'; circ(M.x, cy, r * (hole + .1));
+      cx.fillStyle = '#020202'; circ(M.x, cy, r * hole);
+    }
+    ring(M.y + R * 1.05, R * .58, .45);
+    ring(M.y, R, .64);
+    px(M.x - R * .55, M.y - R * .6, Math.max(1, R * .14), Math.max(1, R * .14), 'rgba(255,255,255,.35)');
+    var bd = { x: M.x, y: M.y - R - 1.2 }; px(bd.x - .5, bd.y, 1, 1, '#d8d8e0');                              // the bead
+    if (B.mz > .05) { cx.fillStyle = 'rgba(255,240,190,' + B.mz + ')'; circ(M.x, M.y, R * (1.2 + (1 - B.mz) * 2)); cx.fillStyle = 'rgba(255,255,240,' + B.mz + ')'; circ(M.x, M.y, R * .8); B.mz *= .8; }
   }
   function shellUp(x, y, live, s) {
     s = s || 1;
@@ -1300,7 +1340,7 @@
   $('shootThem').onclick = function () { if (animating) return; B.sel = -1; B.fp = 1; B.aimTT = 1; sfx('rackSoft'); send({ a: 'shoot', i: 1 }); };
   $('shootSelf').onclick = function () {
     if (B.steal >= 0) { B.steal = -1; renderBuck(); return; }
-    if (animating) return; B.sel = -1; B.aimYT = 1; sfx('rackSoft'); send({ a: 'shoot', i: 0 });
+    if (animating) return; B.sel = -1; B.self = 1; B.aimYT = 1; sfx('rackSoft'); send({ a: 'shoot', i: 0 });
   };
 
   // ---------- what each move looks and sounds like ----------
@@ -1370,7 +1410,7 @@
   }
   function shootAnim(e, v) {
     var you = st.you, atYou = e.to === you, self = e.to === e.by, me = e.by === you, name = esc(oppName());
-    if (atYou) B.aimYT = 1; else { B.fp = me ? 1 : 0; B.aimTT = 1; }
+    if (atYou) { B.self = me ? 1 : 0; B.aimYT = 1; } else { B.fp = me ? 1 : 0; B.aimTT = 1; }
     if (!me) sfx('rackSoft');
     say(me ? (self ? 'YOU TURN IT ON YOURSELF...' : 'YOU AIM AT ' + name + '...') : (self ? name + ' TURNS IT ON ITSELF...' : name + ' AIMS AT <b>YOU</b>...'));
     sfx('heart'); setTimeout(function () { sfx('heart'); }, 600);
@@ -1379,7 +1419,7 @@
       if (e.a) {
         sfx(atYou ? 'bangYou' : 'bang'); buzz([90, 40, 180]);
         B.flash = atYou ? 1 : .8; B.shake = atYou ? 16 : 9;
-        if (atYou) { B.red = .95; smoke(100, 86, 10); } else { var tp = gunTip(); part({ t: 'flash', x: tp.x, y: tp.y, life: 8 }); smoke(tp.x, tp.y, 8); B.knock = 1; if (B.fp) B.recoil = 1; }
+        if (atYou) { B.red = .95; var mz = muzzleAt(); B.mz = 1; smoke(mz.x, mz.y, 10); } else { var tp = gunTip(); part({ t: 'flash', x: tp.x, y: tp.y, life: 8 }); smoke(tp.x, tp.y, 8); B.knock = 1; if (B.fp) B.recoil = 1; }
         var before = v.hp[e.to];
         v.hp[e.to] = Math.max(0, before - e.n);
         for (var i = v.hp[e.to]; i < before; i++) breakHeart(e.to, i);
