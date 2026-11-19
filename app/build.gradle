@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.ollee.pulse'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.ollee.pulse'
+        minSdk 26
+        targetSdk 35
+        // CI sets BUILD_NUMBER so every build installs over the last one
+        versionCode Integer.parseInt(System.getenv('BUILD_NUMBER') ?: '1')
+        versionName '2.' + (System.getenv('BUILD_NUMBER') ?: '0')
+    }
+
+    signingConfigs {
+        pulse {
+            storeFile file('pulse.jks')
+            storePassword 'pulse2026'
+            keyAlias 'pulse'
+            keyPassword 'pulse2026'
+        }
+    }
+
+    buildTypes {
+        debug { signingConfig signingConfigs.pulse }
+        release {
+            signingConfig signingConfigs.pulse
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+// No libraries: plain Android only, so the build stays small.

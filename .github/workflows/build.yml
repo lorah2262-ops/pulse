@@ -1,0 +1,49 @@
+name: Build Pulse
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check watch face is valid ES5
+        run: |
+          sed 's/^const subscribe/var subscribe/' watch/Pulse.min.js > /tmp/es5.js
+          npx --yes esbuild@0.24.0 /tmp/es5.js --target=es5 --log-level=warning > /dev/null
+          cmp watch/Pulse.min.js app/src/main/assets/Pulse.min.js || { echo "::error::watch/Pulse.min.js and the app's copy differ. Run tools/build-face.sh"; exit 1; }
+
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk out/Pulse.apk
+          cp watch/Pulse.min.js out/Pulse.min.js
+          ls -la out
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          MSG=$(git log -1 --pretty=%s)
+          gh release create "$TAG" out/Pulse.apk out/Pulse.min.js \
+            --title "Pulse build ${{ github.run_number }}" \
+            --notes "$MSG" --latest
