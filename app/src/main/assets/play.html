@@ -98,6 +98,12 @@
   .card .big { position:relative; font-size:40px; font-weight:900; font-style:italic; text-shadow:2px 2px 0 rgba(0,0,0,.25); z-index:1; }
   .card .corner { position:absolute; font-size:13px; font-weight:900; font-style:italic; color:#fff; text-shadow:1px 1px 0 rgba(0,0,0,.4); z-index:2; }
   .card .tl { left:9px; top:7px; } .card .br { right:9px; bottom:7px; transform:rotate(180deg); }
+  .card .big svg.sym { width:52px; height:52px; display:block; filter:drop-shadow(2px 2px 0 rgba(0,0,0,.22)); }
+  .card .corner svg.sym { width:15px; height:15px; display:block; color:#fff; filter:drop-shadow(1px 1px 0 rgba(0,0,0,.4)); }
+  .card .corner svg.wildmini { width:17px; height:17px; }
+  .card u { text-decoration-thickness:3px; text-underline-offset:3px; }
+  .card .corner u { text-decoration-thickness:1.5px; text-underline-offset:1px; }
+  .card .face { box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); }
   .c0 .face { background:var(--r); } .c0 .big { color:var(--r); }
   .c1 .face { background:var(--g); } .c1 .big { color:var(--g); }
   .c2 .face { background:var(--b); } .c2 .big { color:var(--b); }
@@ -154,6 +160,30 @@
   body.buck.busy #bkact button, body.buck.busy .bit { opacity:.35; pointer-events:none; }
   @keyframes dread { 0%,100% { box-shadow:4px 4px 0 #000; } 50% { box-shadow:4px 4px 0 #000, 0 0 22px rgba(224,74,46,.55); } }
   .shake { animation:shake2 .4s; }
+  /* the waiver you sign to sit down */
+  .legal, .sigl, .stamp { display:none; }
+  body.buck #join .panel { background:#cfc5ad; color:#1c1812; border:0; box-shadow:0 18px 40px rgba(0,0,0,.7), inset 0 0 60px rgba(90,70,40,.35);
+    transform:rotate(-1.2deg); position:relative; padding:22px 20px 20px; margin-top:6vh;
+    background-image:repeating-linear-gradient(0deg, transparent 0 23px, rgba(60,80,120,.12) 23px 24px), radial-gradient(80% 60% at 70% 20%, rgba(255,255,255,.18), transparent); }
+  body.buck #join h2 { font-size:20px; letter-spacing:3px; text-transform:uppercase; text-align:center; border-bottom:2px solid #1c1812; padding-bottom:8px; }
+  body.buck #join p.soft { color:#4a4234; text-align:center; font-size:12px; letter-spacing:1px; margin-bottom:10px; }
+  body.buck .legal { display:block; margin:0 0 14px; padding-left:18px; font-size:12px; line-height:1.45; color:#2c2619; }
+  body.buck .legal li { margin-bottom:4px; }
+  body.buck .sigl { display:block; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#5a5040; margin-bottom:2px; }
+  body.buck #join input { background:transparent; border:0; border-bottom:2px solid #1c1812; color:#16233f; padding:4px 2px 2px;
+    font:italic 30px "Segoe Script", "Brush Script MT", "Dancing Script", cursive; }
+  body.buck #join input::placeholder { color:rgba(28,24,18,.25); font-style:italic; }
+  body.buck #join button { background:#1c1812; color:#cfc5ad; box-shadow:3px 3px 0 rgba(0,0,0,.4); margin-top:6px; }
+  body.buck .stamp { display:block; position:absolute; right:16px; bottom:96px; transform:rotate(-9deg); border:3px solid rgba(168,40,26,.75); color:rgba(168,40,26,.8);
+    font-weight:900; font-size:11px; letter-spacing:2px; padding:4px 7px; text-align:center; line-height:1.2; pointer-events:none; }
+  /* the ending: black room, one line */
+  body.buck #over .panel { background:transparent; border:0; box-shadow:none; text-align:center; margin-top:20vh; }
+  body.buck .win { font-style:normal; font-size:38px; letter-spacing:8px; color:#a8281a; text-shadow:0 0 18px rgba(200,40,20,.6), 3px 3px 0 #000;
+    animation:flickin 1.6s steps(1) both; }
+  body.buck.won .win { color:#e7dccb; text-shadow:0 0 18px rgba(255,230,180,.35), 3px 3px 0 #000; }
+  body.buck .score { letter-spacing:3px; text-transform:uppercase; font-size:12px; margin-top:14px; }
+  body.buck #over button { margin-top:26px; }
+  @keyframes flickin { 0% { opacity:0; } 20% { opacity:1; } 26% { opacity:.2; } 32% { opacity:1; } 60% { opacity:.7; } 64%, 100% { opacity:1; } }
 
   @keyframes rise { from { transform:translateY(30px); opacity:0; } }
   @keyframes pop { from { transform:scale(.6); opacity:0; } }
@@ -175,9 +205,17 @@
 <header><b id="title">PULSE <i>GAMES</i></b><span id="code"></span><button id="mute" title="Sound">&#128266;</button></header>
 
 <section class="screen on" id="join">
-  <div class="panel">
+  <div class="panel" id="joinPanel">
+    <div class="stamp">VOID IF<br>DECEASED</div>
     <h2 id="joinTitle">Join the game</h2>
     <p class="soft" id="joinSub">You'll play against an Ollee watch.</p>
+    <ol class="legal">
+      <li>The undersigned enters the back room of their own free will.</li>
+      <li>One shotgun. Live and blank shells, loaded in an order nobody knows.</li>
+      <li>Players take turns. Shoot the other one, or yourself and gamble on a blank.</li>
+      <li>The house is not responsible for lost lives, lost items, or lost nerve.</li>
+    </ol>
+    <label class="sigl">Sign here</label>
     <input id="name" maxlength="14" placeholder="Your name" autocomplete="nickname">
     <div class="row"><button id="joinBtn">Join</button></div>
   </div>
@@ -272,8 +310,10 @@
     document.body.className = k;
     $('title').innerHTML = k === 'buck' ? 'BUCK<i>SHOT</i>' : 'PULSE <i>UNO</i>';
     document.title = k === 'buck' ? 'Buckshot' : 'Pulse UNO';
-    $('joinTitle').textContent = k === 'buck' ? 'Take a seat' : 'Join the game';
-    $('joinSub').textContent = k === 'buck' ? 'Two players. One shotgun. You against the watch.' : "You'll play against an Ollee watch.";
+    $('joinTitle').textContent = k === 'buck' ? 'General release' : 'Join the game';
+    $('joinSub').textContent = k === 'buck' ? 'Read before you sit down.' : "You'll play against an Ollee watch.";
+    $('name').placeholder = k === 'buck' ? 'your name' : 'Your name';
+    $('joinBtn').textContent = k === 'buck' ? 'Sign & take a seat' : 'Join';
     $('startBtn').textContent = k === 'buck' ? 'Load the shotgun' : 'Deal the cards';
     if (k === 'buck') ambient();
     document.querySelector('meta[name=theme-color]').content = k === 'buck' ? '#0a0a09' : '#0b1424';
@@ -487,6 +527,7 @@
       show('over');
       var me = st.winner === st.you;
       $('winText').textContent = kind === 'buck' ? (me ? 'YOU WALK AWAY' : 'YOU DIED') : (me ? 'You win! 🎉' : st.players[st.winner].name + ' wins!');
+      document.body.classList.toggle('won', me);
       $('scoreText').textContent = st.players.map(function (p) { return p.name + ' ' + p.score; }).join('  ·  ');
       if (!wasOver) { if (me) { confetti(); if (kind !== 'buck') sfx('win'); } else if (kind !== 'buck') sfx('lose'); }
       return;
@@ -497,12 +538,27 @@
   // ================= UNO =================
   var flown = [], ghosts = [], wildIndex = -1;
   function label(c) { var v = c & 15; return v === 13 ? 'W' : v === 14 ? '+4' : v < 10 ? '' + v : v === 10 ? '⊘' : v === 11 ? '⇄' : '+2'; }
+  // the symbols printed on action cards, drawn as SVG so they stay sharp
+  var SK = '<circle cx="20" cy="20" r="12.5" fill="none" stroke="currentColor" stroke-width="5.5"/><path d="M11.5 28.5 28.5 11.5" stroke="currentColor" stroke-width="5.5"/>';
+  var AR = 'M-11 -2.5h9v-5l10 7.5-10 7.5v-5h-9z';
+  var RV = '<path d="' + AR + '" fill="currentColor" transform="translate(14.5 14.5) rotate(-45)"/><path d="' + AR + '" fill="currentColor" transform="translate(25.5 25.5) rotate(135)"/>';
+  function mini(x, y, r, fill) { return '<g transform="rotate(' + r + ' ' + (x + 7) + ' ' + (y + 10) + ')"><rect x="' + x + '" y="' + y + '" width="14" height="20" rx="2.5" fill="' + fill + '" stroke="#fff" stroke-width="2"/><rect x="' + (x + 1) + '" y="' + (y + 1) + '" width="12" height="18" rx="2" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1"/></g>'; }
+  function svg(inner, cls) { return '<svg class="' + (cls || 'sym') + '" viewBox="0 0 40 40" aria-hidden="true">' + inner + '</svg>'; }
+  function symbol(v, col, big) {
+    if (v === 10) return svg(SK);
+    if (v === 11) return svg(RV);
+    if (v === 12) return big ? svg(mini(8, 12, -12, col) + mini(17, 8, 8, col)) : '+2';
+    if (v === 13) return big ? '' : svg('<g transform="rotate(-28 20 20)"><path d="M20 6a9 14 0 0 0-9 14h9z" fill="#ef4444"/><path d="M20 6a9 14 0 0 1 9 14h-9z" fill="#3b82f6"/><path d="M11 20a9 14 0 0 0 9 14V20z" fill="#facc15"/><path d="M29 20a9 14 0 0 1-9 14V20z" fill="#22c55e"/></g>', 'sym wildmini');
+    if (v === 14) return big ? svg(mini(3, 13, -14, HEX[2]) + mini(10, 9, -5, HEX[3]) + mini(17, 9, 5, HEX[0]) + mini(24, 13, 14, HEX[1])) : '+4';
+    return v === 6 || v === 9 ? '<u>' + v + '</u>' : '' + v;
+  }
   function cardEl(c) {
     var d = document.createElement('div');
     if (c < 0) { d.className = 'card back'; d.innerHTML = '<div class="face"><span class="big">UNO</span></div>'; return d; }
-    d.className = 'card c' + (c >> 4);
-    var l = label(c);
-    d.innerHTML = '<div class="face"><span class="big">' + l + '</span></div><span class="corner tl">' + l + '</span><span class="corner br">' + l + '</span>';
+    var v = c & 15, k = c >> 4, col = k < 4 ? HEX[k] : '#111';
+    d.className = 'card c' + k + (v >= 10 ? ' act' : '');
+    var corner = symbol(v, col, false);
+    d.innerHTML = '<div class="face"><span class="big">' + symbol(v, col, true) + '</span></div><span class="corner tl">' + corner + '</span><span class="corner br">' + corner + '</span>';
     return d;
   }
   function rot(c, i) { return (((c + 7) * 37 + i * 53) % 28) - 14; }
@@ -695,7 +751,7 @@
 
   var B = { aimT: 0, aimY: 0, aimTT: 0, aimYT: 0, spin: 0, shake: 0, flash: 0, red: 0, dark: 0, light: 1, flick: 0, nextFlick: 0,
             knock: 0, slump: 0, blinkAt: 0, blinkTo: 0, glint: 0, parts: [], pops: [], dust: null, load: null, view: null,
-            sel: -1, steal: -1, stolen: -1, hurt: -1, glow: -1, glowTo: 0, beat: 0, cut: 0, dy: 0 };
+            sel: -1, steal: -1, stolen: -1, hurt: -1, glow: -1, glowTo: 0, beat: 0, cut: 0, dy: 0, fp: 0, recoil: 0 };
   var sc = $('scene'), cx = sc.getContext('2d'), wallC = null, feltC = null, SW = 176, OX = -12;   // the room is 200 wide; we see the middle 176
   function V() { return B.view || st; }
   function snap(s) { return { hp: s.hp.slice(), max: s.max, items: s.items.map(function (l) { return l.slice(); }), cuffed: s.cuffed.slice(), saw: s.saw, left: s.left }; }
@@ -755,28 +811,62 @@
   }
 
   // ---------- pieces of the scene ----------
-  var HS = ['01010', '11111', '01110', '00100'], HB = ['0110110', '1111111', '1111111', '0111110', '0011100', '0001000'];
-  function heartAt(side, i, max) { return side === st.you ? { x: 100 - max * 11 / 2 + i * 11 + 2, y: 131, big: 1 } : { x: 100 - max * 4 + i * 8 + 1.5, y: 49, big: 0 }; }
-  function heart(h, full, hot, glow) {
-    var m = h.big ? HB : HS;
-    for (var r = 0; r < m.length; r++) for (var c = 0; c < m[r].length; c++) {
-      if (m[r].charAt(c) !== '1') continue;
-      var col = !full ? '#2a201b' : hot ? '#ff9a7a' : (r === 0 || (r === 1 && c === 1)) ? '#ff6a4a' : '#c2361f';
-      px(h.x + c, h.y + r, 1, 1, col);
-    }
-    if (glow && full) { cx.fillStyle = 'rgba(255,210,120,.35)'; circ(h.x + m[0].length / 2, h.y + m.length / 2, h.big ? 6 : 4); }
+  // a heart monitor bolted to the wall: each player's charges, and their pulse sweeping across
+  var BOLT = ['00011', '00110', '01100', '11111', '00110', '01100', '11000'];
+  var MON = { x: 132, w: 54, h: 38 };
+  function monY() { return 3 - Math.round(B.dy * .45); }
+  function heartAt(side, i, max) { var r = side === st.you ? 1 : 0; return { x: MON.x + MON.w - 2 - (max - i) * 6, y: monY() + 3 + r * 18, big: 0 }; }
+  function ecg(ph) {
+    if (ph < 3) return Math.sin(ph / 3 * Math.PI) * 1;
+    if (ph < 5) return 0; if (ph < 6) return -1; if (ph < 7) return 6; if (ph < 8) return -2;
+    if (ph < 11) return 0; if (ph < 15) return Math.sin((ph - 11) / 4 * Math.PI) * 1.6; return 0;
   }
   function drawLives(now, v) {
-    var max = v.max || 4;
-    [1 - st.you, st.you].forEach(function (side) {
-      for (var i = 0; i < max; i++) heart(heartAt(side, i, max), i < v.hp[side], B.hurt === side && (now / 90 | 0) % 2, B.glow === side && now < B.glowTo);
+    var max = v.max || 4, x0 = MON.x, y0 = monY(), w = MON.w, h = MON.h;
+    px(x0 - 3, y0 - 3, w + 6, h + 6, '#1a1815'); px(x0 - 3, y0 - 3, w + 6, 1, '#3a352d'); px(x0 - 3, y0 + h + 2, w + 6, 1, '#0a0908');
+    px(x0 + w / 2 - 1, y0 - 9, 2, 6, '#1a1815');                                           // its bracket
+    px(x0, y0, w, h, '#041008');
+    cx.fillStyle = 'rgba(80,255,120,.05)'; cx.fillRect(x0, y0, w, h);
+    [1 - st.you, st.you].forEach(function (side, r) {
+      var hp = v.hp[side], by = y0 + 3 + r * 18, low = hp === 1, dead = hp <= 0;
+      var g = dead ? '#ff4030' : low ? '#ff7a4a' : '#7dff95', dim = dead || low ? 'rgba(255,90,60,.5)' : 'rgba(125,255,149,.5)';
+      ptext(r ? 'YOU' : oppName().slice(0, 5), x0 + 2, by, 1, dim);
+      for (var i = 0; i < max; i++) {
+        var hb = heartAt(side, i, max), lit = i < hp, flash = B.hurt === side && (now / 90 | 0) % 2;
+        var c = lit ? (flash ? '#ffffff' : g) : '#10301a';
+        for (var y = 0; y < 7; y++) for (var xq = 0; xq < 5; xq++) if (BOLT[y].charAt(xq) === '1') px(hb.x + xq, hb.y - 1 + y, 1, 1, c);
+        if (lit && B.glow === side && now < B.glowTo) { cx.fillStyle = 'rgba(160,255,170,.3)'; circ(hb.x + 2.5, hb.y + 2.5, 4); }
+      }
+      // the trace: a sweep that draws as it goes, with a gap just ahead of it
+      var base = by + 12, cols = w - 4, sp = 26, head = (now / sp) % cols, P = hp >= 3 ? 26 : hp === 2 ? 19 : 13;
+      for (var c2 = 0; c2 < cols; c2++) {
+        var age = (head - c2 + cols) % cols; if (age < 3) continue;
+        var tpx = now / sp - age + side * 7, ph = ((tpx % P) + P) % P, val = dead ? 0 : ecg(ph) * (low ? 1.3 : 1);
+        if (low && !dead) val += Math.sin(tpx * 1.7) * .4;
+        cx.globalAlpha = Math.max(.3, 1 - age / cols * .8);
+        px(x0 + 2 + c2, base - Math.round(val), 1, 1, dead ? '#ff4030' : g);
+        cx.globalAlpha = 1;
+      }
+      if (!dead) px(x0 + 2 + Math.floor(head), base - Math.round(ecg(((now / sp + side * 7) % P + P) % P)) - 1, 1, 2, '#e8ffe8');
     });
+    for (var sl = 0; sl < h; sl += 2) { cx.fillStyle = 'rgba(0,0,0,.28)'; cx.fillRect(x0, y0 + sl, w, 1); }
+    cx.fillStyle = 'rgba(255,255,255,.05)'; cx.fillRect(x0 + 1, y0 + 1, w - 2, 4);
+  }
+  var SLOTS = 4;
+  function mySlot(i) { return { x: 100 - SLOTS * 8 + i * 16 + 2, y: 113 }; }
+  function theirSlot(i) { return { x: 100 - SLOTS * 6 + i * 12 + 1, y: 56 }; }
+  function drawSlots() {
+    cx.strokeStyle = 'rgba(210,225,190,.09)'; cx.lineWidth = 1;
+    for (var i = 0; i < SLOTS; i++) {
+      var a = mySlot(i), b = theirSlot(i);
+      cx.strokeRect(a.x - 1.5, a.y - 1.5, 15, 15); cx.strokeRect(b.x - 1.5, b.y - 1.5, 12, 12);
+    }
   }
   function drawItems(now, v) {
     var opp = 1 - st.you, mine = v.items[st.you] || [], theirs = v.items[opp] || [];
-    theirs.forEach(function (it, i) { cx.globalAlpha = .9; cx.drawImage(iconSrc(it), 100 - theirs.length * 6 + i * 12 + 1, 56, 9, 9); cx.globalAlpha = 1; });
+    theirs.forEach(function (it, i) { var q = theirSlot(i); cx.globalAlpha = .9; cx.drawImage(iconSrc(it), q.x, q.y, 9, 9); cx.globalAlpha = 1; });
     mine.forEach(function (it, i) {
-      var x = 100 - mine.length * 8 + i * 16 + 2, y = 113;
+      var x = mySlot(i).x, y = mySlot(i).y;
       cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fillRect(x + 1, y + 10, 10, 2);
       cx.drawImage(iconSrc(it), x, y, 12, 12);
       if ((B.sel === i || B.steal === i) && (now / 250 | 0) % 2) { cx.strokeStyle = '#d9b34a'; cx.lineWidth = 1; cx.strokeRect(x - 1.5, y - 1.5, 15, 15); }
@@ -808,21 +898,47 @@
     hand(d.getMinutes() * Math.PI / 30, 6.5, '#1a1612');
     hand(d.getSeconds() * Math.PI / 30, 7, '#a8281a');
   }
+  var FIG = { hy: 22 };
   function drawFigure(now, v) {
     var br = Math.sin(now / 950) * .9, k = B.knock, sl = B.slump;
-    var hy = 22 + br - k * 6 + sl * 10, by = 48 + br * .4 + sl * 3, hit = k > .35;
-    cx.fillStyle = '#2d2620'; ell(100, by - 1, 42, 18, 1); ell(100, hy - 1, 11.6, 13.6); // the lamp catches the edges
-    cx.fillStyle = hit ? '#2a0d09' : '#100e0c'; ell(100, by, 41, 17, 1); px(95, hy + 6, 10, by - hy - 6, cx.fillStyle); ell(100, hy, 11, 13);
+    var hy = 22 + br - k * 6 + sl * 10, by = 48 + br * .4 + sl * 3, hit = k > .35, lean = sl * 5;
+    FIG.hy = hy;
+    var coat = hit ? '#2a0d09' : '#100e0c', rim = '#2f2820';
+    // suit: shoulders, the lamp catching their tops, lapels, a pale collar and a dark tie
+    cx.fillStyle = rim; ell(100, by - 1, 42, 18, 1);
+    cx.fillStyle = coat; ell(100, by, 41, 17, 1);
+    cx.fillStyle = 'rgba(255,220,160,.06)'; ell(100, by - 2, 36, 14, 1);
+    cx.fillStyle = coat; ell(100, by, 34, 13, 1);
+    px(94, hy + 8, 12, by - hy - 8, '#0c0a09');
+    for (var i = 0; i < 12; i++) { px(94 - i * .55, hy + 12 + i, 1, 1, '#26201a'); px(105 + i * .55, hy + 12 + i, 1, 1, '#26201a'); }
+    for (var j = 0; j < 9; j++) { var w2 = 5 - j * .5; px(100 - w2, hy + 12 + j, w2 * 2, 1, '#4a4338'); }
+    px(99, hy + 13, 2, 11, '#070605'); px(98.5, hy + 13, 3, 2, '#120f0d');
+    // head, tilted when slumped
+    cx.save(); cx.translate(100, hy); cx.rotate(lean * .05);
+    cx.fillStyle = rim; ell(0, 1, 9.6, 11.6); cx.fillStyle = coat; ell(0, 1, 9, 11);
+    // a wide hat: crown, band, brim with its top edge in the light
+    px(-8, -12, 16, 7, '#14110e'); px(-7, -13, 14, 1, '#14110e'); px(-6, -14, 5, 1, '#2e271f'); px(1, -14, 5, 1, '#2e271f'); px(-7, -13, 1, 1, '#2e271f'); px(6, -13, 1, 1, '#2e271f');
+    px(-9, -7, 18, 2, '#060505');
+    px(-17, -5, 34, 2, '#14110e'); px(-17, -5, 34, 1, '#3a3128'); px(-18, -4, 1, 1, '#14110e'); px(17, -4, 1, 1, '#14110e');
+    cx.fillStyle = 'rgba(0,0,0,.55)'; cx.fillRect(-9, -3, 18, 5);   // the brim's shadow over the eyes
+    cx.restore();
     if (sl > .6) return;
     if (now > B.blinkAt) { B.blinkAt = now + 2200 + Math.random() * 4500; B.blinkTo = now + 140; }
     if (now < B.blinkTo) return;
     var col = hit ? '#ff5a3a' : B.aimY > .3 ? '#fff6d8' : '#d8cfa8', ey = B.aimT > .3 ? 1 : 0, ex = B.aimT > .3 || B.aimY > .3 ? 0 : Math.round(Math.sin(now / 2600) * .7);
-    px(94 + ex, hy - 1 + ey, 3, 2, col); px(103 + ex, hy - 1 + ey, 3, 2, col);
-    if (B.glint > 0) { px(102, hy - 3, 1, 1, '#fff'); px(101, hy - 2, 3, 1, 'rgba(255,255,255,.6)'); B.glint -= .02; }
+    var gl = hit ? 'rgba(255,90,58,.25)' : 'rgba(255,240,200,.14)';
+    cx.fillStyle = gl; circ(95.5 + ex, hy + 1 + ey, 2.6); circ(104.5 + ex, hy + 1 + ey, 2.6);
+    px(94 + ex, hy + ey, 3, 2, col); px(103 + ex, hy + ey, 3, 2, col);
+    if (B.glint > 0) { px(102, hy - 2, 1, 1, '#fff'); px(101, hy - 1, 3, 1, 'rgba(255,255,255,.6)'); B.glint -= .02; }
   }
   function drawHands(v) {
     var opp = 1 - st.you, y = 45 + B.slump * 2;
-    [70, 121].forEach(function (x) { px(x, y, 9, 4, '#3f3830'); px(x + 1, y - 1, 7, 1, '#544a40'); for (var f = 1; f < 9; f += 2) px(x + f, y + 3, 1, 1, '#221d18'); });
+    if (!(B.fp === 0 && B.aimT > .5)) [70, 121].forEach(function (x, s) {
+      px(x - 1, y - 2, 11, 3, '#0e0c0a');                                   // cuff
+      px(x, y, 9, 3, '#4a4038'); px(x + 1, y, 7, 1, '#62564a');            // back of the hand
+      for (var f = 0; f < 4; f++) { var fx = x + 1 + f * 2; px(fx, y + 3, 1, 2 + (f === 1 || f === 2 ? 1 : 0), '#4a4038'); px(fx, y + 5 + (f === 1 || f === 2 ? 1 : 0), 1, 1, '#2a231d'); }
+      px(s ? x - 1 : x + 9, y + 1, 1, 2, '#4a4038');                        // thumb
+    });
     if (v.cuffed && v.cuffed[opp]) {
       px(68, y - 1, 2, 6, '#9a9aa4'); px(130, y - 1, 2, 6, '#9a9aa4');
       for (var cxp = 80; cxp < 121; cxp += 3) px(cxp, y + 2 + Math.round(Math.sin(cxp * .2) * .6), 2, 1, '#7a7a84');
@@ -841,18 +957,75 @@
   }
   function gunPose() {
     var a = ease(B.aimT), y = B.aimY;
-    return { x: 100, y: 93 - a * 30 + y * 4, rot: .06 + a * (Math.PI / 2 - .06) - y * 1.3 + B.spin, s: 1 - a * .22 + y * .4 };
+    return { x: 100, y: 93 - a * 37 + y * 4, rot: .06 + a * (Math.PI / 2 - .06) - y * 1.3 + B.spin, s: 1 - a * .22 + y * .4 };
   }
   function gunTip() {
+    if (B.fp && B.aimT > .3) { var g = fpGeo(); return { x: g.T.x, y: g.T.y }; }
     var p = gunPose(), lx = (-41 + B.cut) * p.s, ly = -2.5 * p.s;
     return { x: p.x + Math.cos(p.rot) * lx - Math.sin(p.rot) * ly, y: p.y + Math.sin(p.rot) * lx + Math.cos(p.rot) * ly };
   }
   function drawGun(v) {
     if (B.aimY > .55) return;
+    if (B.fp && B.aimT > .04) { if (B.aimT < .5) { cx.globalAlpha = 1 - B.aimT * 2; } else return; }
     var p = gunPose(), rest = 1 - Math.max(ease(B.aimT), B.aimY);
     if (rest > .05) { cx.fillStyle = 'rgba(0,0,0,' + .4 * rest + ')'; ell(100, 99, 38 * rest, 3); }
     cx.save(); cx.translate(p.x, p.y); cx.rotate(p.rot); cx.scale(p.s, p.s); gunSprite(B.cut); cx.restore();
+    cx.globalAlpha = 1;
+    // his hands on it when it's under his chin
+    if (!B.fp && B.aimT > .5) {
+      [[p.y - 14, 0], [p.y + 2, 1]].forEach(function (h) {
+        var hx = 96, yy = h[0];
+        px(hx - (h[1] ? 9 : 10), yy + 1, h[1] ? 9 : 10, 4, '#0e0c0a');                  // sleeve
+        px(hx - 2, yy, 7, 5, '#5a4e44'); px(hx - 2, yy, 7, 1, '#7a6c5e');
+        for (var f = 0; f < 3; f++) px(hx + 5, yy + f * 2 - 1, 2, 1, '#5a4e44');
+      });
+    }
     if (v.saw && B.aimT < .2 && B.aimY < .2) ptext('X2', 60, 84, 1, '#d9b34a');
+  }
+  // you pick it up: the shotgun from behind, stock at the bottom of the screen, barrel at his head
+  function fpGeo() {
+    var k = ease(Math.min(1, B.aimT)), up = (1 - k) * 95, rc = B.recoil || 0, now = performance.now();
+    var sw = Math.sin(now / 520) * .9 * k, sw2 = Math.cos(now / 690) * .6 * k;
+    var S = { x: 152 + rc * 5, y: 174 + up + rc * 12 }, T = { x: 102 + sw, y: FIG.hy + 14 + up + sw2 - rc * 18 };
+    return { S: S, T: T };
+  }
+  function drawFP(v) {
+    if (!B.fp || B.aimT < .04) return;
+    var g = fpGeo(), S = g.S, T = g.T, dx = T.x - S.x, dy2 = T.y - S.y, L = Math.sqrt(dx * dx + dy2 * dy2);
+    var ux = dx / L, uy = dy2 / L, nx = -uy, ny = ux, end = 1 - Math.min(1, B.cut / 14) * .28;
+    function at(t, off, w) { var sc = 2.6 * (1 - t * .8); return { x: S.x + dx * t + nx * off * sc, y: S.y + dy2 * t + ny * off * sc, w: w * sc }; }
+    function quad(t0, t1, off, w, col) {
+      var a = at(t0, off, w), b = at(t1, off, w);
+      cx.fillStyle = col; cx.beginPath();
+      cx.moveTo(a.x - nx * a.w, a.y - ny * a.w); cx.lineTo(b.x - nx * b.w, b.y - ny * b.w);
+      cx.lineTo(b.x + nx * b.w, b.y + ny * b.w); cx.lineTo(a.x + nx * a.w, a.y + ny * a.w); cx.closePath(); cx.fill();
+    }
+    // magazine tube, barrel, its lit top edge
+    quad(.3, end * .9, 3.2, 2, '#18181d');
+    quad(.22, end, -1.2, 3, '#34343c');
+    quad(.22, end, -1.6, 1.4, '#46464f');
+    quad(.22, end, -3.6, .7, '#9a9aa6');
+    // pump: wood with grip ridges
+    quad(.44, .63, 2.4, 4.6, '#5e3a20'); quad(.44, .63, .2, 1.2, '#8a5a34');
+    for (var r = .46; r < .62; r += .035) quad(r, r + .012, 2.4, 4.6, '#3c2412');
+    // receiver and trigger guard
+    quad(.13, .3, 0, 6.2, '#2e2e35'); quad(.13, .3, -4.4, 1.2, '#6a6a76'); quad(.18, .24, 6, 2, '#18181c');
+    // stock
+    quad(-.08, .15, 1, 8, '#5b3a22'); quad(-.08, .15, -5.5, 1.6, '#7e5333');
+    // muzzle and bead
+    var m = at(end, -1.2, 3); cx.fillStyle = '#050505'; circ(m.x, m.y, Math.max(1, m.w * .7)); var bd = at(end - .01, -4.4, 1); cx.fillStyle = '#d8d8e0'; circ(bd.x, bd.y, Math.max(.7, bd.w * .45));
+    // your arms come up from below; fingers wrap the pump and the grip
+    var h1 = at(.535, 1.5, 6), h2 = at(.1, 2, 7);
+    function arm(h, ex, ey, wd) { cx.fillStyle = '#16120e'; cx.beginPath(); cx.moveTo(h.x - nx * wd, h.y - ny * wd + 2); cx.lineTo(h.x + nx * wd, h.y + ny * wd + 2); cx.lineTo(ex + wd * 1.6, ey); cx.lineTo(ex - wd * 1.6, ey); cx.closePath(); cx.fill(); }
+    arm(h1, h1.x - 40, 190, h1.w * .9); arm(h2, h2.x + 26, 200, h2.w * .9);
+    function grip(t0, t1, off, w, skin, lit) {
+      quad(t0, t1, off, w, skin); quad(t0, t1, off - w * .7, w * .25, lit);
+      for (var f = 0; f < 4; f++) { var tf = t0 + (t1 - t0) * (f + .5) / 4; quad(tf - .002, tf + .002, off + w * .2, w * .75, 'rgba(0,0,0,.35)'); }
+    }
+    grip(.505, .565, 1.6, 5.4, '#7a5c48', '#9c7a62');
+    grip(.06, .14, 2, 7.2, '#6a4f3d', '#8a6a54');
+    if (v.saw) ptext('X2', S.x - 34, Math.min(140, S.y - 46), 1, '#d9b34a');
+    if (B.recoil) B.recoil *= .82;
   }
   // staring down the barrel
   function drawMuzzle() {
@@ -879,6 +1052,14 @@
   function drawLoad(now) {
     var L = B.load; if (!L) return;
     var n = L.shells.length, el = now - L.t0;
+    if (!L.t1 && el > n * 120 + 150) {
+      var a = Math.min(1, (el - n * 120 - 150) / 250);
+      cx.globalAlpha = a;
+      cx.fillStyle = 'rgba(0,0,0,.6)'; cx.fillRect(34, 45, 132, 25);
+      ptext(L.live + ' LIVE', 100, 47, 2, '#e04a2e', 'c');
+      ptext(L.blank + ' BLANK', 100, 59, 1, '#9fb3c4', 'c');
+      cx.globalAlpha = 1;
+    }
     for (var i = 0; i < n; i++) {
       var x = 100 - n * 7.5 + i * 15 + 4, y = 84;
       if (el < i * 120) continue;
@@ -976,7 +1157,7 @@
     cx.setTransform(1, 0, 0, 1, OX + Math.round(sx), Math.round(sy) + dy);
     cx.drawImage(wallC, 0, -dy);
     drawPipe(now);
-    drawBoard(); drawClock();
+    drawBoard(); drawLives(now, v);
     // cord, shade, bulb
     for (var cy = -dy; cy < 1; cy++) px(100 + (lx - 100) * (cy + dy) / (dy + 1), cy, 1, 1, '#2a2620');
     px(lx - 7, 1, 14, 3, '#3b342a'); px(lx - 10, 4, 20, 2, '#4f463a'); px(lx - 10, 4, 20, 1, '#6a5e4c');
@@ -989,7 +1170,7 @@
     var gt = cx.createRadialGradient(lx, 84, 4, lx, 84, 82); gt.addColorStop(0, 'rgba(255,225,160,' + .17 * L + ')'); gt.addColorStop(1, 'rgba(255,225,160,0)');
     cx.fillStyle = gt; cx.fillRect(0, 44, 200, 104);
     drawHands(v);
-    drawLives(now, v);
+    drawSlots();
     drawItems(now, v);
     drawLoad(now);
     drawGun(v);
@@ -1009,12 +1190,13 @@
     cx.fillStyle = dk; cx.fillRect(-20, -dy - 20, 240, H + 40);
     if (L < 1) { cx.fillStyle = 'rgba(0,0,0,' + (1 - L) * .75 + ')'; cx.fillRect(-20, -dy - 20, 240, H + 40); }
     drawBulb(now);
+    drawFP(v);
     drawMuzzle();
     drawPops(now);
     // on the glass, not in the room: names, shells left, red, flash
     cx.setTransform(1, 0, 0, 1, 0, 0);
     ptext(oppName().slice(0, 10), 4, 4, 1, '#8a7f6e');
-    for (var s = 0; s < (v.left || 0); s++) { px(W - 7 - s * 5, 3, 3, 5, '#6a6a6a'); px(W - 7 - s * 5, 7, 3, 2, '#c9a24a'); }
+    for (var s = 0; s < (v.left || 0); s++) { px(4 + s * 5, 11, 3, 5, '#6a6a6a'); px(4 + s * 5, 15, 3, 2, '#c9a24a'); }
     if (v.cuffed && v.cuffed[st.you]) { cx.drawImage(iconSrc(1), 4, H - 14, 10, 10); ptext('CUFFED', 17, H - 11, 1, '#9a9aa4'); }
     if (B.red > .02) {
       var rg = cx.createRadialGradient(W / 2, H / 2, H * .2, W / 2, H / 2, H * .8); rg.addColorStop(0, 'rgba(150,0,0,0)'); rg.addColorStop(1, 'rgba(150,0,0,' + B.red + ')');
@@ -1115,7 +1297,7 @@
     }
     send({ a: 'item', i: i });
   }
-  $('shootThem').onclick = function () { if (animating) return; B.sel = -1; B.aimTT = 1; sfx('rackSoft'); send({ a: 'shoot', i: 1 }); };
+  $('shootThem').onclick = function () { if (animating) return; B.sel = -1; B.fp = 1; B.aimTT = 1; sfx('rackSoft'); send({ a: 'shoot', i: 1 }); };
   $('shootSelf').onclick = function () {
     if (B.steal >= 0) { B.steal = -1; renderBuck(); return; }
     if (animating) return; B.sel = -1; B.aimYT = 1; sfx('rackSoft'); send({ a: 'shoot', i: 0 });
@@ -1135,7 +1317,7 @@
   function showLoad(e) {
     var s = [], v = B.view || (B.view = snap(st));
     for (var i = 0; i < e.a; i++) s.push(1); for (var j = 0; j < e.n; j++) s.push(0);
-    B.load = { shells: s, t0: performance.now() };
+    B.load = { shells: s, t0: performance.now(), live: e.a, blank: e.n };
     v.left = s.length;
     say('<b>' + e.a + ' LIVE</b> · ' + e.n + ' BLANK. IN AN ORDER NOBODY KNOWS.');
     s.forEach(function (x, k) { setTimeout(function () { sfx('clack'); }, k * 120 + 40); });
@@ -1188,7 +1370,7 @@
   }
   function shootAnim(e, v) {
     var you = st.you, atYou = e.to === you, self = e.to === e.by, me = e.by === you, name = esc(oppName());
-    if (atYou) B.aimYT = 1; else B.aimTT = 1;
+    if (atYou) B.aimYT = 1; else { B.fp = me ? 1 : 0; B.aimTT = 1; }
     if (!me) sfx('rackSoft');
     say(me ? (self ? 'YOU TURN IT ON YOURSELF...' : 'YOU AIM AT ' + name + '...') : (self ? name + ' TURNS IT ON ITSELF...' : name + ' AIMS AT <b>YOU</b>...'));
     sfx('heart'); setTimeout(function () { sfx('heart'); }, 600);
@@ -1197,7 +1379,7 @@
       if (e.a) {
         sfx(atYou ? 'bangYou' : 'bang'); buzz([90, 40, 180]);
         B.flash = atYou ? 1 : .8; B.shake = atYou ? 16 : 9;
-        if (atYou) { B.red = .95; smoke(100, 86, 10); } else { var tp = gunTip(); part({ t: 'flash', x: tp.x, y: tp.y, life: 8 }); smoke(tp.x, tp.y, 8); B.knock = 1; }
+        if (atYou) { B.red = .95; smoke(100, 86, 10); } else { var tp = gunTip(); part({ t: 'flash', x: tp.x, y: tp.y, life: 8 }); smoke(tp.x, tp.y, 8); B.knock = 1; if (B.fp) B.recoil = 1; }
         var before = v.hp[e.to];
         v.hp[e.to] = Math.max(0, before - e.n);
         for (var i = v.hp[e.to]; i < before; i++) breakHeart(e.to, i);
