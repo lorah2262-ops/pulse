@@ -25,9 +25,12 @@ jobs:
 
       - name: Check watch face is valid ES5
         run: |
-          sed 's/^const subscribe/var subscribe/' watch/Pulse.min.js > /tmp/es5.js
-          npx --yes esbuild@0.24.0 /tmp/es5.js --target=es5 --log-level=warning > /dev/null
-          cmp watch/Pulse.min.js app/src/main/assets/Pulse.min.js || { echo "::error::watch/Pulse.min.js and the app's copy differ. Run tools/build-face.sh"; exit 1; }
+          for f in Pulse DayPack; do
+            sed 's/^const subscribe/var subscribe/' watch/$f.min.js > /tmp/es5.js
+            npx --yes esbuild@0.24.0 /tmp/es5.js --target=es5 --log-level=warning > /dev/null
+            cmp watch/$f.min.js app/src/main/assets/$f.min.js || { echo "::error::watch/$f.min.js and the app's copy differ"; exit 1; }
+          done
+          node tools/watch-sim-daypack.js watch/DayPack.min.js
 
       - name: Build APK
         run: |

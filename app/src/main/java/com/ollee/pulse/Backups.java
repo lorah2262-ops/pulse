@@ -74,6 +74,15 @@ final class Backups {
         }
     }
 
+    /** The newest copy of the face the watch calls name, or null if Pulse never sent it. */
+    static Entry newest(Context c, String name) {
+        if (name == null || name.trim().isEmpty()) return null;
+        String want = safe(name.trim());
+        Entry best = null;
+        for (Entry e : all(c)) if (e.name.equalsIgnoreCase(want) && (best == null || e.time > best.time)) best = e;
+        return best;
+    }
+
     /** All copies: faces A to Z, newest first within each. */
     static List<Entry> all(Context c) {
         List<Entry> out = new ArrayList<>();

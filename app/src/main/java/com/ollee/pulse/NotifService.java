@@ -702,6 +702,7 @@ public class NotifService extends NotificationListenerService implements WatchLi
     /** Inside the night hours: drop the link. Outside: bring it back. Then wait for the next change. */
     void applyNight() {
         if (link == null) return;
+        if (DayPack.holding) { h.postDelayed(this::applyNight, 60_000L); return; }   // a day pack install is using the link
         Profiles.auto(this);                       // a profile set to start at this hour
         if (Saver.isNight(this)) link.pause("Night link-off until " + Saver.hourName(Saver.to(this)));
         else link.resume();
@@ -771,6 +772,16 @@ public class NotifService extends NotificationListenerService implements WatchLi
             tickReceiver = true;
         }
         applyNight();
+        if (!packReceiver) {
+            IntentFilter f = new IntentFilter(DayPack.ACTION);
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(packAlarm, f, Context.RECEIVER_NOT_EXPORTED);
+            else registerReceiver(packAlarm, f);
+            try {
+                getContentResolver().registerContentObserver(android.provider.CalendarContract.CONTENT_URI, true, calChanged);
+            } catch (Exception ignored) { }
+            packReceiver = true;
+        }
+        DayPack.plan(this);
         if (!showReceiver) {
             // exported: MacroDroid is another app. Registered here because Android 8+
             // doesn't deliver this kind of broadcast to receivers in the manifest.
@@ -796,6 +807,21 @@ public class NotifService extends NotificationListenerService implements WatchLi
 
     private final Runnable partyWatch = () -> h.post(() -> { if (face != null) face.partyChanged(); });
 
+    // day pack: its alarm, and a fresh plan when the calendar changes (waits a little: edits come in bursts)
+    private boolean packReceiver;
+    private final BroadcastReceiver packAlarm = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context c, Intent i) { DayPack.run(c); }
+    };
+    private final Runnable replan = () -> DayPack.plan(this);
+    private final android.database.ContentObserver calChanged = new android.database.ContentObserver(h) {
+        @Override
+        public void onChange(boolean self) {
+            h.removeCallbacks(replan);
+            h.postDelayed(replan, 20_000L);
+        }
+    };
+
     @Override
     public void onDestroy() {
         Party.watchers.remove(partyWatch);
@@ -814,6 +840,11 @@ public class NotifService extends NotificationListenerService implements WatchLi
         if (tickReceiver) {
             try { unregisterReceiver(nightTick); } catch (Exception ignored) { }
             tickReceiver = false;
+        }
+        if (packReceiver) {
+            try { unregisterReceiver(packAlarm); } catch (Exception ignored) { }
+            try { getContentResolver().unregisterContentObserver(calChanged); } catch (Exception ignored) { }
+            packReceiver = false;
         }
         h.removeCallbacks(flushBatch);
         super.onDestroy();

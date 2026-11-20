@@ -234,6 +234,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         TextView sub = text("Your watch, talking to your phone.", 15, Glass.SOFT);
         sub.setPadding(0, 0, 0, dp(10));
         col.addView(sub);
+        buildUpdates(col);
         Glass.enter(kicker, 0);
         Glass.enter(title, 0);
         Glass.enter(sub, 1);
@@ -418,6 +419,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
             feats.addView(lineRow(f[1], f[2], t));
         }
         final Section musicSec = buildMusicCard(col);
+        buildDayPack(col);
 
         // ---- battery saver ----
         col = pages[BATTERY];
@@ -1519,6 +1521,8 @@ public class MainActivity extends Activity implements WatchLink.Listener {
             }
         });
         refreshFaces();
+        checkUpdate(false);
+        if (packState != null) packState.setText(DayPack.status(this));
         aurora.play(true);
         onStatus(status);
         buildChecklist();
@@ -4599,6 +4603,110 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         View v = new View(this);
         v.setLayoutParams(new LinearLayout.LayoutParams(1, dp(10)));
         return v;
+    }
+
+    // ---------- day pack ----------
+
+    private TextView packState;
+
+    private void buildDayPack(LinearLayout col) {
+        Section sec = section(col, "DAY PACK", false);
+        sec.body.addView(note("A little before your next calendar event, Pulse puts a face with your coming events "
+                + "into Forge A: the clock, a countdown and beeps before each one, all on the watch. Bluetooth can "
+                + "stay off in between. After the last event, your own Forge A face goes back."));
+        Glass.Toggle on = new Glass.Toggle(this, Glass.ACCENT);
+        on.set(DayPack.on(this), false);
+        on.setOnChange(v -> DayPack.setOn(this, v));
+        sec.body.addView(hairline());
+        sec.body.addView(lineRow("Day pack", "Uses your calendar (allow Calendar in Setup)", on));
+        final int[] leads = {15, 30, 60, 120}, reminds = {5, 10, 15, 30};
+        final TextView lead = chip(DayPack.lead(this) + " min");
+        lead.setOnClickListener(v -> {
+            int cur = DayPack.lead(this), n = leads[0];
+            for (int i = 0; i < leads.length; i++) if (leads[i] == cur) n = leads[(i + 1) % leads.length];
+            DayPack.setLead(this, n);
+            swapText(lead, n + " min");
+        });
+        sec.body.addView(hairline());
+        sec.body.addView(lineRow("Install before", "How long before the first event", lead));
+        final TextView rem = chip(DayPack.remind(this) + " min");
+        rem.setOnClickListener(v -> {
+            int cur = DayPack.remind(this), n = reminds[0];
+            for (int i = 0; i < reminds.length; i++) if (reminds[i] == cur) n = reminds[(i + 1) % reminds.length];
+            DayPack.setRemind(this, n);
+            swapText(rem, n + " min");
+        });
+        sec.body.addView(hairline());
+        sec.body.addView(lineRow("Beep before each", "The watch beeps then, and again as it starts", rem));
+        sec.body.addView(hairline());
+        packState = text(DayPack.status(this), 13, Glass.MUTED);
+        packState.setPadding(0, dp(10), 0, dp(10));
+        sec.body.addView(packState);
+        LinearLayout row = new LinearLayout(this);
+        row.addView(pill("Install now", true, v -> { DayPack.now(this); confirm((TextView) v, "Install now"); }), weight());
+        row.addView(gap());
+        row.addView(pill("Put my face back", false, v -> DayPack.restoreNow(this)), weight());
+        sec.body.addView(row);
+        DayPack.watcher = () -> { if (packState != null) packState.setText(DayPack.status(this)); };
+    }
+
+    // ---------- updates from GitHub ----------
+
+    private LinearLayout updCard;
+    private TextView updText, updBtn;
+    private Updater.Info updInfo;
+
+    private void buildUpdates(LinearLayout col) {
+        updCard = card(col, 24);
+        updCard.addView(label("APP UPDATE"));
+        updText = text("Build " + Updater.mine(this) + ". Checking GitHub...", 14, Glass.SOFT);
+        updCard.addView(updText);
+        LinearLayout row = new LinearLayout(this);
+        row.setPadding(0, dp(12), 0, 0);
+        updBtn = pill("Install", true, v -> installUpdate());
+        row.addView(updBtn, weight());
+        row.addView(gap());
+        row.addView(pill("Check", false, v -> checkUpdate(true)), weight());
+        updCard.addView(row);
+        updCard.setVisibility(View.GONE);
+    }
+
+    /** Quietly a few times a day; the card only shows when there is something new (or on Check). */
+    private void checkUpdate(boolean asked) {
+        long last = prefs().getLong("upd_checked", 0);
+        if (!asked && System.currentTimeMillis() - last < 6 * 3600_000L) {
+            if (prefs().getInt("upd_latest", 0) > Updater.mine(this) && updInfo == null) checkUpdate(true);
+            return;
+        }
+        if (asked && updText != null) updText.setText("Checking GitHub...");
+        Updater.check(this, (info, err) -> {
+            if (updCard == null) return;
+            int me = Updater.mine(this);
+            updInfo = info != null && info.build > me ? info : null;
+            if (updInfo != null) {
+                updCard.setVisibility(View.VISIBLE);
+                updBtn.setVisibility(View.VISIBLE);
+                updText.setText("Build " + info.build + " is ready (you have " + me + ")."
+                        + (info.notes == null || info.notes.isEmpty() ? "" : "\n" + info.notes.split("\n")[0]));
+            } else if (asked) {
+                updCard.setVisibility(View.VISIBLE);
+                updBtn.setVisibility(View.GONE);
+                updText.setText(err != null ? err : "Up to date: build " + me + ".");
+            } else updCard.setVisibility(View.GONE);
+        });
+    }
+
+    private void installUpdate() {
+        if (updInfo == null) { checkUpdate(true); return; }
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            updText.setText("Allow Pulse to install apps, then tap Install again.");
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            } catch (ActivityNotFoundException ignored) { }
+            return;
+        }
+        Updater.screen = (msg, over) -> { if (updText != null) updText.setText(msg); };
+        Updater.install(this, updInfo);
     }
 
     private Section section(LinearLayout parent, String title, boolean open) {
