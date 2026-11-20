@@ -419,7 +419,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
             feats.addView(lineRow(f[1], f[2], t));
         }
         final Section musicSec = buildMusicCard(col);
-        buildDayPack(col);
+        final Section packSec = buildDayPack(col);
 
         // ---- battery saver ----
         col = pages[BATTERY];
@@ -1040,7 +1040,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
 
         // the Watch tab is long: its cards go into three groups behind a segmented switch
         View[][] groups = {
-                {mirror, feats, musicSec.card, animSec.card, menuSec.card, tips.card},
+                {mirror, feats, musicSec.card, packSec.card, animSec.card, menuSec.card, tips.card},
                 {aiSec.card, keySec.card, photoSec.card, useSec.card},
                 {timeSec.card, sentSec.card}};
         splitWatch(groups, new String[]{"Watch face", "AI & keys", "History"});
@@ -1267,12 +1267,14 @@ public class MainActivity extends Activity implements WatchLink.Listener {
                     card.setAlpha(1f);
                     card.setTranslationX(0f);
                     card.setTranslationY(0f);
+                    card.setScaleX(1f);
+                    card.setScaleY(1f);
                     continue;
                 }
                 card.setAlpha(0f);
                 card.setTranslationX(dir * dp(54));
                 card.setTranslationY(dp(10));
-                card.animate().alpha(1f).translationX(0f).translationY(0f).setStartDelay(40L + 55L * i)
+                card.animate().alpha(1f).translationX(0f).translationY(0f).scaleX(1f).scaleY(1f).setStartDelay(40L + 55L * i)
                         .setDuration(700).setInterpolator(Glass.GENTLE).start();
             }
         }
@@ -4572,30 +4574,77 @@ public class MainActivity extends Activity implements WatchLink.Listener {
             }
         }
 
+        private ValueAnimator fold;
+        private LayoutTransition keptPage, keptCard;      // the resize animations, put back after a fold
+
+        /** Opens by growing from its title down to its full height, rows dropping in; closes the same way back. */
         void toggle() {
             open = !open;
             chevron.animate().rotation(open ? 90 : 0).setDuration(700)
                     .setInterpolator(Glass.BOUNCY).start();
+            if (fold != null) fold.cancel();
+            body.animate().cancel();
+            final int w = card.getWidth() - card.getPaddingLeft() - card.getPaddingRight();
+            if (w <= 0) {                                   // not on screen yet: no animation needed
+                body.setVisibility(open ? View.VISIBLE : View.GONE);
+                body.setAlpha(1f);
+                setBodyHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+                return;
+            }
+            // the page's and card's own resize animations would fight this one: off while it runs
+            final ViewGroup page = card.getParent() instanceof ViewGroup ? (ViewGroup) card.getParent() : null;
+            if (page != null && page.getLayoutTransition() != null) keptPage = page.getLayoutTransition();
+            if (card.getLayoutTransition() != null) keptCard = card.getLayoutTransition();
+            final LayoutTransition pageT = keptPage, cardT = keptCard;
+            if (page != null) page.setLayoutTransition(null);
+            card.setLayoutTransition(null);
+            int from = body.getVisibility() == View.VISIBLE ? body.getHeight() : 0, to = 0;
             if (open) {
-                // the card grows to make room, then the rows drop in one after another from above
-                body.animate().cancel();
                 body.setVisibility(View.VISIBLE);
                 body.setAlpha(1f);
-                body.setScaleY(1f);
                 body.setTranslationY(0f);
+                body.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+                to = body.getMeasuredHeight();
                 for (int i = 0; i < body.getChildCount(); i++) {
                     View row = body.getChildAt(i);
                     row.animate().cancel();
                     if (i > 11) { row.setAlpha(1f); row.setTranslationY(0f); continue; }
                     row.setAlpha(0f);
-                    row.setTranslationY(-dp(12));
-                    row.animate().alpha(1f).translationY(0f).setStartDelay(90L + 40L * i).setDuration(620)
+                    row.setTranslationY(-dp(10));
+                    row.animate().alpha(1f).translationY(0f).setStartDelay(60L + 30L * i).setDuration(460)
                             .setInterpolator(Glass.GENTLE).start();
                 }
-            } else {
-                body.animate().alpha(0f).translationY(-dp(8)).setStartDelay(0).setDuration(220)
-                        .withEndAction(() -> { body.setVisibility(View.GONE); body.setTranslationY(0f); }).start();
             }
+            setBodyHeight(from);
+            final boolean opening = open;
+            fold = ValueAnimator.ofInt(from, to);
+            fold.setDuration(opening ? 480 : 300);
+            fold.setInterpolator(opening ? Glass.GENTLE : new DecelerateInterpolator());
+            fold.addUpdateListener(an -> {
+                setBodyHeight((Integer) an.getAnimatedValue());
+                if (!opening) body.setAlpha(1f - an.getAnimatedFraction());
+            });
+            fold.addListener(new android.animation.AnimatorListenerAdapter() {
+                boolean cancelled;
+                @Override public void onAnimationCancel(android.animation.Animator an) { cancelled = true; }
+                @Override public void onAnimationEnd(android.animation.Animator an) {
+                    if (cancelled) return;
+                    if (!opening) body.setVisibility(View.GONE);
+                    body.setAlpha(1f);
+                    setBodyHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+                    if (card.getLayoutTransition() == null) card.setLayoutTransition(cardT);
+                    if (page != null && page.getLayoutTransition() == null && pageT != null) page.setLayoutTransition(pageT);
+                }
+            });
+            fold.start();
+        }
+
+        private void setBodyHeight(int h) {
+            ViewGroup.LayoutParams lp = body.getLayoutParams();
+            if (lp == null || lp.height == h) return;
+            lp.height = h;
+            body.setLayoutParams(lp);
         }
     }
 
@@ -4609,7 +4658,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
 
     private TextView packState;
 
-    private void buildDayPack(LinearLayout col) {
+    private Section buildDayPack(LinearLayout col) {
         Section sec = section(col, "DAY PACK", false);
         sec.body.addView(note("A little before your next calendar event, Pulse puts a face with your coming events "
                 + "into Forge A: the clock, a countdown and beeps before each one, all on the watch. Bluetooth can "
@@ -4696,6 +4745,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         row.addView(pill("Put my face back", false, v -> DayPack.restoreNow(this)), weight());
         sec.body.addView(row);
         DayPack.watcher = () -> { if (packState != null) packState.setText(DayPack.status(this)); };
+        return sec;
     }
 
     // ---------- updates from GitHub ----------
