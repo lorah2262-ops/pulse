@@ -274,7 +274,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         status.addView(btns);
 
         // ---- profiles: School, Home, Sleep ----
-        Section profSec = section(col, "PROFILES", true);
+        Section profSec = section(col, "PROFILES", false);
         final int nowProf = Profiles.current(this);
         profSec.summary.setText(nowProf < 0 ? "None yet" : Profiles.NAMES[nowProf]);
         profSec.body.addView(note("One tap sets the feature switches and battery savers for where you are. "
@@ -422,7 +422,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
 
         // ---- battery saver ----
         col = pages[BATTERY];
-        Section saverSec = section(col, "BATTERY SAVER", true);
+        Section saverSec = section(col, "BATTERY SAVER", false);
         final Runnable saverCount = () -> {
             int k = (Saver.quiet(this) ? 1 : 0) + (prefs().getInt(Saver.BATCH, 0) > 0 ? 1 : 0)
                     + (prefs().getInt(Saver.VOLT, 0) > 0 ? 1 : 0) + (Saver.seconds(this) ? 0 : 1)
@@ -515,7 +515,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         // ---- apps that may reach the watch ----
         col = pages[MESSAGES];
         cards = 0;
-        appsSec = section(col, "APPS", true);
+        appsSec = section(col, "APPS", false);
         appsSec.body.addView(note("Pick which apps may reach the watch. An app shows up here after its first "
                 + "notification."));
         Glass.Toggle only = new Glass.Toggle(this, Glass.ACCENT);
@@ -596,7 +596,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         col = pages[MACROS];
         cards = 0;
         macroWheel(col);
-        macroSec = section(col, "MACROS", true);
+        macroSec = section(col, "MACROS", false);
         macroSec.body.addView(note("Names show on the watch, 6 letters at most. Empty hides the slot. Tap a type "
                 + "to change it."));
         macroRows = new LinearLayout(this);
@@ -4574,77 +4574,30 @@ public class MainActivity extends Activity implements WatchLink.Listener {
             }
         }
 
-        private ValueAnimator fold;
-        private LayoutTransition keptPage, keptCard;      // the resize animations, put back after a fold
-
-        /** Opens by growing from its title down to its full height, rows dropping in; closes the same way back. */
         void toggle() {
             open = !open;
             chevron.animate().rotation(open ? 90 : 0).setDuration(700)
                     .setInterpolator(Glass.BOUNCY).start();
-            if (fold != null) fold.cancel();
-            body.animate().cancel();
-            final int w = card.getWidth() - card.getPaddingLeft() - card.getPaddingRight();
-            if (w <= 0) {                                   // not on screen yet: no animation needed
-                body.setVisibility(open ? View.VISIBLE : View.GONE);
-                body.setAlpha(1f);
-                setBodyHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
-                return;
-            }
-            // the page's and card's own resize animations would fight this one: off while it runs
-            final ViewGroup page = card.getParent() instanceof ViewGroup ? (ViewGroup) card.getParent() : null;
-            if (page != null && page.getLayoutTransition() != null) keptPage = page.getLayoutTransition();
-            if (card.getLayoutTransition() != null) keptCard = card.getLayoutTransition();
-            final LayoutTransition pageT = keptPage, cardT = keptCard;
-            if (page != null) page.setLayoutTransition(null);
-            card.setLayoutTransition(null);
-            int from = body.getVisibility() == View.VISIBLE ? body.getHeight() : 0, to = 0;
             if (open) {
+                // the card grows to make room, then the rows drop in one after another from above
+                body.animate().cancel();
                 body.setVisibility(View.VISIBLE);
                 body.setAlpha(1f);
+                body.setScaleY(1f);
                 body.setTranslationY(0f);
-                body.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
-                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-                to = body.getMeasuredHeight();
                 for (int i = 0; i < body.getChildCount(); i++) {
                     View row = body.getChildAt(i);
                     row.animate().cancel();
                     if (i > 11) { row.setAlpha(1f); row.setTranslationY(0f); continue; }
                     row.setAlpha(0f);
-                    row.setTranslationY(-dp(10));
-                    row.animate().alpha(1f).translationY(0f).setStartDelay(60L + 30L * i).setDuration(460)
+                    row.setTranslationY(-dp(12));
+                    row.animate().alpha(1f).translationY(0f).setStartDelay(90L + 40L * i).setDuration(620)
                             .setInterpolator(Glass.GENTLE).start();
                 }
+            } else {
+                body.animate().alpha(0f).translationY(-dp(8)).setStartDelay(0).setDuration(220)
+                        .withEndAction(() -> { body.setVisibility(View.GONE); body.setTranslationY(0f); }).start();
             }
-            setBodyHeight(from);
-            final boolean opening = open;
-            fold = ValueAnimator.ofInt(from, to);
-            fold.setDuration(opening ? 480 : 300);
-            fold.setInterpolator(opening ? Glass.GENTLE : new DecelerateInterpolator());
-            fold.addUpdateListener(an -> {
-                setBodyHeight((Integer) an.getAnimatedValue());
-                if (!opening) body.setAlpha(1f - an.getAnimatedFraction());
-            });
-            fold.addListener(new android.animation.AnimatorListenerAdapter() {
-                boolean cancelled;
-                @Override public void onAnimationCancel(android.animation.Animator an) { cancelled = true; }
-                @Override public void onAnimationEnd(android.animation.Animator an) {
-                    if (cancelled) return;
-                    if (!opening) body.setVisibility(View.GONE);
-                    body.setAlpha(1f);
-                    setBodyHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
-                    if (card.getLayoutTransition() == null) card.setLayoutTransition(cardT);
-                    if (page != null && page.getLayoutTransition() == null && pageT != null) page.setLayoutTransition(pageT);
-                }
-            });
-            fold.start();
-        }
-
-        private void setBodyHeight(int h) {
-            ViewGroup.LayoutParams lp = body.getLayoutParams();
-            if (lp == null || lp.height == h) return;
-            lp.height = h;
-            body.setLayoutParams(lp);
         }
     }
 
