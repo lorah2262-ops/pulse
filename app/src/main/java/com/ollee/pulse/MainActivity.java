@@ -1275,7 +1275,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
                 card.setTranslationX(dir * dp(54));
                 card.setTranslationY(dp(10));
                 card.animate().alpha(1f).translationX(0f).translationY(0f).scaleX(1f).scaleY(1f).setStartDelay(40L + 55L * i)
-                        .setDuration(700).setInterpolator(Glass.GENTLE).start();
+                        .setDuration(640).setInterpolator(Glass.GENTLE).withLayer().start();
             }
         }
         if (animate) Glass.pop(subLabels[n]);
@@ -1359,8 +1359,10 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         in.setVisibility(View.VISIBLE);
         still(in);
         in.setAlpha(0f);
+        out.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        in.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         pageRun = ValueAnimator.ofFloat(0f, 1f);
-        pageRun.setDuration(620);
+        pageRun.setDuration(600);
         pageRun.setInterpolator(null);
         pageRun.addUpdateListener(a -> {
             float f = a.getAnimatedFraction();
@@ -1383,6 +1385,8 @@ public class MainActivity extends Activity implements WatchLink.Listener {
             @Override public void onAnimationEnd(android.animation.Animator a) {
                 still(in);
                 still(out);
+                in.setLayerType(View.LAYER_TYPE_NONE, null);
+                out.setLayerType(View.LAYER_TYPE_NONE, null);
                 if (tab != from) out.setVisibility(View.GONE);
             }
         });
@@ -1395,8 +1399,8 @@ public class MainActivity extends Activity implements WatchLink.Listener {
             card.animate().cancel();
             if (i >= shown) { card.setTranslationY(0f); continue; }
             card.setTranslationY(dp(22) + dp(9) * i);
-            card.animate().translationY(0f).setStartDelay(60L + 45L * i).setDuration(760)
-                    .setInterpolator(Glass.GENTLE).start();
+            card.animate().translationY(0f).setStartDelay(60L + 45L * i).setDuration(680)
+                    .setInterpolator(Glass.GENTLE).withLayer().start();
         }
     }
 
@@ -4592,10 +4596,10 @@ public class MainActivity extends Activity implements WatchLink.Listener {
                     row.setAlpha(0f);
                     row.setTranslationY(-dp(12));
                     row.animate().alpha(1f).translationY(0f).setStartDelay(90L + 40L * i).setDuration(620)
-                            .setInterpolator(Glass.GENTLE).start();
+                            .setInterpolator(Glass.GENTLE).withLayer().start();
                 }
             } else {
-                body.animate().alpha(0f).translationY(-dp(8)).setStartDelay(0).setDuration(220)
+                body.animate().alpha(0f).translationY(-dp(8)).setStartDelay(0).setDuration(220).withLayer()
                         .withEndAction(() -> { body.setVisibility(View.GONE); body.setTranslationY(0f); }).start();
             }
         }
@@ -4788,7 +4792,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         lt.disableTransitionType(LayoutTransition.APPEARING);
         lt.disableTransitionType(LayoutTransition.DISAPPEARING);
         // neighbours don't jump out of the way: they are pushed, overshoot and settle
-        lt.setDuration(700);
+        lt.setDuration(560);
         lt.setInterpolator(LayoutTransition.CHANGING, Glass.GENTLE);
         lt.setInterpolator(LayoutTransition.CHANGE_APPEARING, Glass.GENTLE);
         lt.setInterpolator(LayoutTransition.CHANGE_DISAPPEARING, Glass.GENTLE);

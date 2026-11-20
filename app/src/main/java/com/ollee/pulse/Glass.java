@@ -60,16 +60,23 @@ final class Glass {
     }
 
     /** Taps and switches: goes about a seventh past, comes back once, and rests. Soft, not twitchy. */
-    static final Springy BOUNCY = new Springy(0.52f, 1.3f);
+    static final Springy BOUNCY = new Springy(0.56f, 1.25f);
     /** Pages, cards making room, the tab bubble: glides in and settles with the smallest overshoot. */
-    static final Springy GENTLE = new Springy(0.68f, 1.0f);
+    static final Springy GENTLE = new Springy(0.74f, 0.95f);
 
     /** Blurs a view by this many pixels (0 = sharp). Only Android 12 and up can; older ones skip it. */
     static void blur(View v, float px) {
         if (android.os.Build.VERSION.SDK_INT < 31) return;
-        v.setRenderEffect(px < 0.5f ? null
-                : android.graphics.RenderEffect.createBlurEffect(px, px, Shader.TileMode.CLAMP));
+        // a new blur makes the GPU redo the whole view, so it changes in 2 px steps, not every frame
+        float step = px < 0.5f ? 0f : Math.max(2f, Math.round(px / 2f) * 2f);
+        Object last = v.getTag(R_BLUR);
+        if (last instanceof Float && (Float) last == step) return;
+        v.setTag(R_BLUR, step);
+        v.setRenderEffect(step == 0f ? null
+                : android.graphics.RenderEffect.createBlurEffect(step, step, Shader.TileMode.CLAMP));
     }
+
+    private static final int R_BLUR = 0x7f0f0b1a;   // a view tag key for the last blur set
 
     /**
      * A page that can be pulled past its ends: it follows the finger at a fraction of the
@@ -240,11 +247,13 @@ final class Glass {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         private float x, y, r = 1f, level;
         private ValueAnimator run;
+        private android.graphics.RadialGradient shade;
 
         void at(float nx, float ny, float nr) {
             x = nx;
             y = ny;
             r = Math.max(1f, nr);
+            shade = null;
             invalidateSelf();
         }
 
@@ -259,9 +268,12 @@ final class Glass {
         @Override
         public void draw(Canvas c) {
             if (level <= 0.01f) return;
-            p.setShader(new android.graphics.RadialGradient(x, y, r,
-                    new int[]{(Math.round(120 * level) << 24) | 0xFFFFFF, (Math.round(45 * level) << 24) | 0xFFFFFF, 0x00FFFFFF},
-                    new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
+            if (shade == null) {
+                shade = new android.graphics.RadialGradient(x, y, r, new int[]{0x78FFFFFF, 0x2DFFFFFF, 0x00FFFFFF},
+                        new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP);
+                p.setShader(shade);
+            }
+            p.setAlpha(Math.round(255 * level));
             c.drawRect(getBounds(), p);
         }
 
@@ -287,8 +299,8 @@ final class Glass {
         v.setScaleX(0.96f);
         v.setScaleY(0.96f);
         v.animate().alpha(1f).translationY(0f).scaleX(1f).scaleY(1f)
-                .setStartDelay(70L + order * 60L).setDuration(820)
-                .setInterpolator(GENTLE).start();
+                .setStartDelay(70L + Math.min(order, 8) * 55L).setDuration(760)
+                .setInterpolator(GENTLE).withLayer().start();
     }
 
 
