@@ -4638,6 +4638,54 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         });
         sec.body.addView(hairline());
         sec.body.addView(lineRow("Beep before each", "The watch beeps then, and again as it starts", rem));
+        // leave-by: when to set off for events that have a place
+        Glass.Toggle lb = new Glass.Toggle(this, Glass.ACCENT);
+        lb.set(LeaveBy.on(this), false);
+        lb.setOnChange(v -> {
+            prefs().edit().putBoolean("lb_on", v).apply();
+            if (v && LeaveBy.from(this).isEmpty() && !LeaveBy.canLocate(this))
+                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 61);
+            DayPack.plan(this);
+        });
+        sec.body.addView(hairline());
+        sec.body.addView(lineRow("Leave-by time", "For events with a place: GO and the time to leave, with a beep", lb));
+        final TextView mode = chip(LeaveBy.MODES[LeaveBy.mode(this)]);
+        mode.setOnClickListener(v -> {
+            int n = (LeaveBy.mode(this) + 1) % LeaveBy.MODES.length;
+            prefs().edit().putInt("lb_mode", n).apply();
+            swapText(mode, LeaveBy.MODES[n]);
+            DayPack.plan(this);
+        });
+        sec.body.addView(hairline());
+        sec.body.addView(lineRow("Getting there by", "Commute allows for jeeps, buses and waiting", mode));
+        final int[] bufs = {5, 10, 15, 20, 30};
+        final TextView buf = chip(LeaveBy.buffer(this) + " min");
+        buf.setOnClickListener(v -> {
+            int cur = LeaveBy.buffer(this), n = bufs[0];
+            for (int i = 0; i < bufs.length; i++) if (bufs[i] == cur) n = bufs[(i + 1) % bufs.length];
+            prefs().edit().putInt("lb_buffer", n).apply();
+            swapText(buf, n + " min");
+            DayPack.plan(this);
+        });
+        sec.body.addView(hairline());
+        sec.body.addView(lineRow("Spare time", "Added to the travel time", buf));
+        final EditText from = field("Start from: where the phone is");
+        from.setText(LeaveBy.from(this));
+        LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-1, -2);
+        fp.topMargin = dp(10);
+        sec.body.addView(from, fp);
+        LinearLayout fromRow = new LinearLayout(this);
+        fromRow.setGravity(Gravity.CENTER_VERTICAL);
+        fromRow.setPadding(0, dp(8), 0, 0);
+        fromRow.addView(text("Optional: a home address to always start from", 13, Glass.MUTED), weight());
+        fromRow.addView(pill("Save", true, v -> {
+            prefs().edit().putString("lb_from", from.getText().toString().trim()).apply();
+            if (from.getText().toString().trim().isEmpty() && LeaveBy.on(this) && !LeaveBy.canLocate(this))
+                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 61);
+            DayPack.plan(this);
+            confirm((TextView) v, "Save");
+        }));
+        sec.body.addView(fromRow);
         sec.body.addView(hairline());
         packState = text(DayPack.status(this), 13, Glass.MUTED);
         packState.setPadding(0, dp(10), 0, dp(10));

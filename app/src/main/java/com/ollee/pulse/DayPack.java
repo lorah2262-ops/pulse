@@ -39,7 +39,7 @@ final class DayPack {
 
     /** True while Pulse holds the link up for the day pack (night link-off waits). */
     static volatile boolean holding;
-    private static boolean working;
+    private static boolean working, looking;
     private static final Handler h = new Handler(Looper.getMainLooper());
 
     // ---------- settings ----------
@@ -75,8 +75,17 @@ final class DayPack {
 
     static final class Ev {
         final long begin, end;
-        final String title;
-        Ev(long b, long e, String t) { begin = b; end = Math.max(e, b + 15 * MIN); title = t; }
+        final String title, place;
+        long leave;                                      // when to set off (leave-by), 0 if none
+        Ev(long b, long e, String t, String pl) { begin = b; end = Math.max(e, b + 15 * MIN); title = t; place = pl == null ? "" : pl.trim(); }
+    }
+
+    /** When the pack has to be on the watch for this event: lead time before it, or before leaving for it. */
+    static long dueAt(Context c, Ev e) {
+        long at = e.begin - lead(c) * MIN;
+        int travel = LeaveBy.cached(c, e.place);
+        if (travel >= 0) at = Math.min(at, e.begin - (travel + LeaveBy.buffer(c) + 15) * MIN);
+        return at;
     }
 
     /** Timed events (no all-day ones) that start between from and to, soonest first. */
@@ -88,14 +97,15 @@ final class DayPack {
             ContentUris.appendId(u, to);
             try (Cursor q = c.getContentResolver().query(u.build(),
                     new String[]{CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN,
-                            CalendarContract.Instances.END, CalendarContract.Instances.ALL_DAY},
+                            CalendarContract.Instances.END, CalendarContract.Instances.ALL_DAY,
+                            CalendarContract.Instances.EVENT_LOCATION},
                     CalendarContract.Instances.VISIBLE + "=1", null, CalendarContract.Instances.BEGIN + " ASC")) {
                 while (q != null && q.moveToNext()) {
                     if (q.getInt(3) == 1) continue;
                     long b = q.getLong(1);
                     if (b < from) continue;
                     String t = Txt.clean(q.getString(0), 30);
-                    out.add(new Ev(b, q.getLong(2), t.isEmpty() ? "EVEnt" : t));
+                    out.add(new Ev(b, q.getLong(2), t.isEmpty() ? "EVEnt" : t, q.getString(4)));
                 }
             }
         } catch (SecurityException e) {
@@ -137,7 +147,11 @@ final class DayPack {
             if (i > 0) a.append(',');
             a.append('[').append(k.get(Calendar.YEAR)).append(',').append(k.get(Calendar.MONTH)).append(',')
                     .append(k.get(Calendar.DAY_OF_MONTH)).append(',').append(k.get(Calendar.HOUR_OF_DAY)).append(',')
-                    .append(k.get(Calendar.MINUTE)).append(",\"").append(t).append("\"]");
+                    .append(k.get(Calendar.MINUTE)).append(",\"").append(t).append("\",");
+            if (e.leave > 0 && e.leave < e.begin) {
+                k.setTimeInMillis(e.leave);
+                a.append(k.get(Calendar.HOUR_OF_DAY)).append(',').append(k.get(Calendar.MINUTE)).append(']');
+            } else a.append("-1,0]");
         }
         a.append(']');
         String js = tpl.replace("[[\"__EV__\"]]", a.toString()).replace("[\"__RM__\"]", "[" + remindMin + "]");
@@ -191,10 +205,20 @@ final class DayPack {
         if (evs == null) { wakeAt(c, 0); say(c, "Allow Calendar in Setup"); return; }
         if (evs.isEmpty()) { wakeAt(c, now + 6 * HOUR); say(c, "No events in the next 36 hours"); return; }
         Ev e = evs.get(0);
-        long at = e.begin - lead(c) * MIN;
+        if (LeaveBy.on(c) && !e.place.isEmpty() && LeaveBy.cached(c, e.place) < 0 && !looking) {
+            looking = true;
+            final Context app = c;
+            new Thread(() -> {
+                LeaveBy.leaveAt(app, e.place, e.begin);          // fills the cache (or marks it unknown)
+                h.post(() -> { looking = false; plan(app); });
+            }).start();
+        }
+        long at = dueAt(c, e);
         // look again every few hours too, so new or moved events are seen
         wakeAt(c, at <= now ? now : Math.min(at, now + 3 * HOUR));
-        say(c, at <= now ? "Installing for " + e.title + "..." : "Next: " + e.title + " at " + when(e.begin) + ". Installs at " + when(at));
+        int tr = LeaveBy.cached(c, e.place);
+        String go = tr >= 0 ? ", leave " + when(e.begin - (tr + LeaveBy.buffer(c)) * MIN) : "";
+        say(c, at <= now ? "Installing for " + e.title + "..." : "Next: " + e.title + " at " + when(e.begin) + go + ". Installs at " + when(at));
     }
 
     private static String prevName(Context c) {
@@ -212,13 +236,13 @@ final class DayPack {
             if (on(app) && now < p(app).getLong("dp_until", 0)) { plan(app); return; }
             // time to come off: unless the next stretch is about to start, then just refresh it
             List<Ev> evs = on(app) ? events(app, now - AFTER, now + 36 * HOUR) : null;
-            if (evs != null && !evs.isEmpty() && evs.get(0).begin - lead(app) * MIN <= now + 2 * MIN) install(app, evs);
+            if (evs != null && !evs.isEmpty() && dueAt(app, evs.get(0)) <= now + 2 * MIN) install(app, evs);
             else restore(app);
             return;
         }
         if (!on(app)) { plan(app); return; }
         List<Ev> evs = events(app, now - AFTER, now + 36 * HOUR);
-        if (evs == null || evs.isEmpty() || evs.get(0).begin - lead(app) * MIN > now + 2 * MIN) { plan(app); return; }
+        if (evs == null || evs.isEmpty() || dueAt(app, evs.get(0)) > now + 2 * MIN) { plan(app); return; }
         install(app, evs);
     }
 
@@ -245,6 +269,17 @@ final class DayPack {
         final long first = all.get(0).begin;
         final List<Ev> evs = new ArrayList<>();
         for (Ev e : all) if (e.begin <= first + 16 * HOUR && evs.size() < MAX_EVENTS) evs.add(e);
+        if (LeaveBy.on(c)) {
+            working = true;
+            say(c, "Working out when to leave...");
+            new Thread(() -> {
+                for (Ev e : evs) if (!e.place.isEmpty()) e.leave = LeaveBy.leaveAt(c, e.place, e.begin);
+                h.post(() -> { working = false; send(c, evs); });
+            }).start();
+        } else send(c, evs);
+    }
+
+    private static void send(final Context c, final List<Ev> evs) {
         final long until = stretchEnd(evs) + AFTER;
         final byte[] js = build(c, evs, remind(c));
         if (js == null) { say(c, "This app has no Day Pack face inside"); return; }

@@ -1,9 +1,9 @@
 // Simulated Ollee watch: fake clock, timers, screen log. node sim.js face.js
 const vm = require('vm'), fs = require('fs');
-let src = fs.readFileSync(process.argv[2], "utf8");
+let src = fs.readFileSync(process.argv[2], 'utf8');
 // two events today: 9:30 and 10:15 (local), remind 10 min; clock starts 9:05
 const base = new Date(2026, 10, 20, 9, 5, 0).getTime();
-src = src.replace('[["__EV__"]]', '[[2026,10,20,9,30,"MAtH CLASS"],[2026,10,20,10,15,"LAb"]]').replace('["__RM__"]', '[10]');
+src = src.replace('[["__EV__"]]', '[[2026,10,20,9,30,"MAtH CLASS",9,12],[2026,10,20,10,15,"LAb",-1,0]]').replace('["__RM__"]', '[10]');
 let T = base, timers = [], tid = 0, active = true, screen = { m: '', d: '', colon: 0, lap: 0, pm: 0 }, beeps = [];
 const RealDate = Date;
 function FakeDate(...a) { return a.length ? new RealDate(...a) : new RealDate(T); }

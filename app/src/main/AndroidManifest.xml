@@ -16,6 +16,8 @@
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- leave-by: where the phone is, roughly, to work out travel time to an event -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
