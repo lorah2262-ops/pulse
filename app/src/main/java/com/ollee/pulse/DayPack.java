@@ -273,7 +273,13 @@ final class DayPack {
             working = true;
             say(c, "Working out when to leave...");
             new Thread(() -> {
-                for (Ev e : evs) if (!e.place.isEmpty()) e.leave = LeaveBy.leaveAt(c, e.place, e.begin);
+                for (int i = 0; i < evs.size(); i++) {
+                    Ev e = evs.get(i), before = i > 0 ? evs.get(i - 1) : null;
+                    // already there: the class before is at the same place and ends in time
+                    boolean there = before != null && before.place.equalsIgnoreCase(e.place) && before.end <= e.begin
+                            && e.begin - before.end < JOIN_GAP;
+                    if (!e.place.isEmpty() && !there) e.leave = LeaveBy.leaveAt(c, e.place, e.begin);
+                }
                 h.post(() -> { working = false; send(c, evs); });
             }).start();
         } else send(c, evs);
