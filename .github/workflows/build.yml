@@ -32,6 +32,17 @@ jobs:
           done
           node tools/watch-sim-daypack.js watch/DayPack.min.js
 
+      - name: Remove older releases and their tags (only the newest is kept)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | while read -r t; do
+            gh release delete "$t" --cleanup-tag --yes
+          done
+          git ls-remote --tags origin | awk '{print $2}' | sed 's#refs/tags/##' | grep '^build-' | while read -r t; do
+            git push origin ":refs/tags/$t" || true
+          done
+
       - name: Build APK
         env:
           PULSE_KS_PASS: ${{ secrets.PULSE_KS_PASS }}
