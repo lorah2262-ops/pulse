@@ -16,11 +16,12 @@ android {
     }
 
     signingConfigs {
+        // the key's password is a GitHub secret (PULSE_KS_PASS), never in the code
         pulse {
             storeFile file('pulse.jks')
-            storePassword 'pulse2026'
+            storePassword System.getenv('PULSE_KS_PASS') ?: ''
             keyAlias 'pulse'
-            keyPassword 'pulse2026'
+            keyPassword System.getenv('PULSE_KS_PASS') ?: ''
         }
     }
 

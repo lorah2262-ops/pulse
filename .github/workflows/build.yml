@@ -33,7 +33,10 @@ jobs:
           node tools/watch-sim-daypack.js watch/DayPack.min.js
 
       - name: Build APK
+        env:
+          PULSE_KS_PASS: ${{ secrets.PULSE_KS_PASS }}
         run: |
+          if [ -z "$PULSE_KS_PASS" ]; then echo "::error::Add the PULSE_KS_PASS secret (Settings > Secrets and variables > Actions)"; exit 1; fi
           chmod +x gradlew
           ./gradlew assembleRelease --stacktrace
           mkdir -p out
