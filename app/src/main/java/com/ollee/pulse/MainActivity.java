@@ -234,7 +234,6 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         TextView sub = text("Your watch, talking to your phone.", 15, Glass.SOFT);
         sub.setPadding(0, 0, 0, dp(10));
         col.addView(sub);
-        buildUpdates(col);
         Glass.enter(kicker, 0);
         Glass.enter(title, 0);
         Glass.enter(sub, 1);
@@ -812,6 +811,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
 
         // ---- setup ----
         col = pages[HOME];
+        buildUpdates(col);
         setupSec = section(col, "SETUP", false);   // opens by itself while something is missing
         Section fileSec = section(col, "SETUP FILE", false);
         fileSec.summary.setText("Share your setup");
@@ -4750,47 +4750,48 @@ public class MainActivity extends Activity implements WatchLink.Listener {
 
     // ---------- updates from GitHub ----------
 
-    private LinearLayout updCard;
+    private Section updSec;
     private TextView updText, updBtn;
     private Updater.Info updInfo;
 
+    /** Always on Home: this build, a Check button, and Install when GitHub has a newer one. */
     private void buildUpdates(LinearLayout col) {
-        updCard = card(col, 24);
-        updCard.addView(label("APP UPDATE"));
-        updText = text("Build " + Updater.mine(this) + ". Checking GitHub...", 14, Glass.SOFT);
-        updCard.addView(updText);
+        updSec = section(col, "APP UPDATE", false);
+        updSec.summary.setText("Build " + Updater.mine(this));
+        updText = text("Build " + Updater.mine(this) + ". Tap Check to look on GitHub.", 14, Glass.SOFT);
+        updSec.body.addView(updText);
         LinearLayout row = new LinearLayout(this);
         row.setPadding(0, dp(12), 0, 0);
         updBtn = pill("Install", true, v -> installUpdate());
+        updBtn.setVisibility(View.GONE);
         row.addView(updBtn, weight());
         row.addView(gap());
         row.addView(pill("Check", false, v -> checkUpdate(true)), weight());
-        updCard.addView(row);
-        updCard.setVisibility(View.GONE);
+        updSec.body.addView(row);
     }
 
-    /** Quietly a few times a day; the card only shows when there is something new (or on Check). */
+    /** Quietly a few times a day, and when asked; a new build opens the card by itself. */
     private void checkUpdate(boolean asked) {
-        long last = prefs().getLong("upd_checked", 0);
-        if (!asked && System.currentTimeMillis() - last < 6 * 3600_000L) {
-            if (prefs().getInt("upd_latest", 0) > Updater.mine(this) && updInfo == null) checkUpdate(true);
-            return;
-        }
+        if (!asked && System.currentTimeMillis() - prefs().getLong("upd_checked", 0) < 6 * 3600_000L
+                && prefs().getInt("upd_latest", 0) <= Updater.mine(this)) return;
         if (asked && updText != null) updText.setText("Checking GitHub...");
         Updater.check(this, (info, err) -> {
-            if (updCard == null) return;
+            if (updSec == null) return;
             int me = Updater.mine(this);
             updInfo = info != null && info.build > me ? info : null;
             if (updInfo != null) {
-                updCard.setVisibility(View.VISIBLE);
+                updSec.summary.setText("Build " + info.build + " ready");
+                updSec.summary.setTextColor(Glass.ACCENT);
                 updBtn.setVisibility(View.VISIBLE);
                 updText.setText("Build " + info.build + " is ready (you have " + me + ")."
                         + (info.notes == null || info.notes.isEmpty() ? "" : "\n" + info.notes.split("\n")[0]));
-            } else if (asked) {
-                updCard.setVisibility(View.VISIBLE);
+                if (!updSec.open) updSec.toggle();
+            } else {
+                updSec.summary.setText(err != null ? "Build " + me : "Build " + me + " · up to date");
+                updSec.summary.setTextColor(Glass.MUTED);
                 updBtn.setVisibility(View.GONE);
-                updText.setText(err != null ? err : "Up to date: build " + me + ".");
-            } else updCard.setVisibility(View.GONE);
+                if (asked) updText.setText(err != null ? err : "Up to date: build " + me + " is the newest.");
+            }
         });
     }
 
