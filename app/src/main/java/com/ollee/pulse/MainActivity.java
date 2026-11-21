@@ -3902,12 +3902,12 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(dp(150), dp(120));
         al.gravity = Gravity.CENTER_HORIZONTAL;
         c.addView(new TapArt(this, false), al);
-        final TextView st = text("Hold your watch face-down on the back of the phone", 15, Glass.SOFT);
+        final TextView st = text("Hold the sticker (or your watch, face-down) on the back of the phone", 15, Glass.SOFT);
         st.setGravity(Gravity.CENTER);
         st.setPadding(0, dp(10), 0, dp(6));
         c.addView(st, new LinearLayout.LayoutParams(-1, -2));
         final boolean[] done = {false};
-        final Runnable close = sheet("Write the tag", "Puts Pulse's link on your watch's NFC tag", c);
+        final Runnable close = sheet("Write the tag", "Puts Pulse's link on an NFC sticker or your watch's tag", c);
         tagSheet = close;
         try {
             nfc.enableReaderMode(this, tag -> {
@@ -3927,7 +3927,7 @@ public class MainActivity extends Activity implements WatchLink.Listener {
                         swapText(st, err);
                     }
                 });
-            }, android.nfc.NfcAdapter.FLAG_READER_NFC_A | android.nfc.NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK, null);
+            }, android.nfc.NfcAdapter.FLAG_READER_NFC_A, null);
             readerOn = true;
         } catch (Exception e) {
             swapText(st, "Couldn't start NFC");
@@ -3963,9 +3963,50 @@ public class MainActivity extends Activity implements WatchLink.Listener {
                 try { f.format(msg); } finally { try { f.close(); } catch (Exception ignored) { } }
                 return null;
             }
-            return "This tag can't hold a link";
+            // a blank NTAG sticker that Android doesn't offer as NDEF: write the pages ourselves
+            android.nfc.tech.MifareUltralight mu = android.nfc.tech.MifareUltralight.get(tag);
+            if (mu != null) return writeNtag(mu, msg.toByteArray());
+            return "This tag can't hold a link (it isn't an NTAG or NDEF tag)";
         } catch (Exception e) {
-            return "Lost the tag: hold the watch still and try again";
+            return "Lost the tag: hold it still and try again";
+        }
+    }
+
+    /**
+     * NTAG213/215/216 (the usual round and square stickers): page 3 says the tag holds NDEF and how big
+     * it is (written only if the tag is blank), and the link goes from page 4 on as 03 len … FE.
+     */
+    private static String writeNtag(android.nfc.tech.MifareUltralight mu, byte[] ndef) throws Exception {
+        mu.connect();
+        try {
+            int size = 0x12;                                   // NTAG213, 144 bytes, unless it says otherwise
+            try {
+                byte[] v = mu.transceive(new byte[]{0x60});     // GET_VERSION
+                if (v != null && v.length >= 7) {
+                    if (v[6] == 0x11) size = 0x3E;               // NTAG215
+                    else if (v[6] == 0x13) size = 0x6D;          // NTAG216
+                }
+            } catch (Exception ignored) {
+                mu.close();                                    // some tags drop the line after an unknown command
+                mu.connect();
+            }
+            byte[] cc = mu.readPages(3);
+            boolean blank = cc[0] == 0 && cc[1] == 0 && cc[2] == 0 && cc[3] == 0;
+            if (!blank && (cc[0] & 0xFF) != 0xE1) return "This sticker is set up for something else, it can't hold a link";
+            if (!blank && (cc[3] & 0x0F) != 0) return "This tag is locked, it can't be written";
+            int room = blank ? size * 8 : (cc[2] & 0xFF) * 8;
+            if (ndef.length + 3 > room || ndef.length > 254) return "This tag is too small";
+            if (blank) mu.writePage(3, new byte[]{(byte) 0xE1, 0x10, (byte) size, 0x00});
+            byte[] tlv = new byte[((ndef.length + 3) + 3) / 4 * 4];
+            tlv[0] = 0x03;
+            tlv[1] = (byte) ndef.length;
+            System.arraycopy(ndef, 0, tlv, 2, ndef.length);
+            tlv[ndef.length + 2] = (byte) 0xFE;
+            for (int i = 0; i < tlv.length; i += 4)
+                mu.writePage(4 + i / 4, java.util.Arrays.copyOfRange(tlv, i, i + 4));
+            return null;
+        } finally {
+            try { mu.close(); } catch (Exception ignored) { }
         }
     }
 
