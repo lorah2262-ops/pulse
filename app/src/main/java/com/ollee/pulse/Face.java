@@ -819,7 +819,7 @@ final class Face {
 
     private void lobby(Party p) {
         String name = "buck".equals(p.kind) ? "bUCK" : "UnO";
-        String web = p.online != null ? "  OnLInE " + p.code : "";
+        String web = p.online != null ? "  OnLInE " + p.code + (NfcTap.games(svc) ? "  OR tAP thE WAtCH" : "") : "";
         String link = Party.address();
         String say = name + (link.isEmpty() ? (web.isEmpty() ? "  nO WIFI - tUrn On HOtSPOt" : web)
                 : "  JOIn " + link + " " + Party.PORT + web) + (p.players.size() > 1 ? "  A StArt" : "");

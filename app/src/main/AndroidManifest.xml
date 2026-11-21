@@ -75,6 +75,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="pulse" android:host="tap" />
             </intent-filter>
+            <!-- the tag with the game link: Pulse takes it on this phone; phones without Pulse open the browser -->
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="https" android:host="*.github.io" />
+            </intent-filter>
         </activity>
 
         <!-- the small "Pulse is listening" window: the mic only works while it is on screen -->

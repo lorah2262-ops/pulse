@@ -3830,6 +3830,28 @@ public class MainActivity extends Activity implements WatchLink.Listener {
             }
         }
 
+        // games: friends tap their phone on the watch to join
+        LinearLayout games = card(col, 24);
+        games.addView(label("GAMES"));
+        tapGames = new Glass.Toggle(this, Glass.ACCENT);
+        tapGames.set(NfcTap.games(this), false);
+        tapGames.setOnChange(on -> {
+            String why = on ? NfcTap.gamesProblem(this) : null;
+            if (why != null) {
+                Toast.makeText(this, why, Toast.LENGTH_LONG).show();
+                ui.postDelayed(() -> tapGames.set(false, true), 250);
+                return;
+            }
+            NfcTap.games(this, on);
+            refreshTap();
+            if (!NfcTap.tagUri(this).equals(prefs().getString("tap_written_uri", NfcTap.URI)))
+                Toast.makeText(this, "Write the tag again to " + (on ? "add" : "remove") + " the game link", Toast.LENGTH_LONG).show();
+        });
+        games.addView(lineRow("Friends tap to join", "Their phone opens your game, no app needed", tapGames));
+        games.addView(note("When you host UNO or Buckshot, a friend holds their phone on your watch and lands in the game "
+                + "(any phone with NFC, iPhone too). Your own taps still do the action above. "
+                + "Needs Online play set up on Home, with the game page on GitHub Pages (github.io)."));
+
         // smart tap, spelled out
         tapSmart = card(col, 24);
         tapSmart.addView(label("SMART TAP"));
@@ -3868,6 +3890,8 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         refreshTap();
     }
 
+    private Glass.Toggle tapGames;
+
     /** The Tap tab's lines and checks, fresh. */
     private void refreshTap() {
         if (tapNfc == null) return;
@@ -3875,7 +3899,11 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         tapNfc.setText(nfc == null ? "✕  This phone has no NFC"
                 : nfc.isEnabled() ? "✓  NFC is on" : "✕  NFC is off · tap here to turn it on");
         long w = prefs().getLong("tap_written", 0);
-        tapTag.setText(w == 0 ? "•  Tag not written yet" : "✓  Tag written " + new java.text.SimpleDateFormat("d MMM", Locale.US).format(new java.util.Date(w)));
+        boolean stale = w != 0 && !NfcTap.tagUri(this).equals(prefs().getString("tap_written_uri", NfcTap.URI));
+        tapTag.setText(w == 0 ? "•  Tag not written yet"
+                : stale ? "•  Write the tag again for " + (NfcTap.games(this) ? "games" : "Pulse only")
+                : "✓  Tag written " + new java.text.SimpleDateFormat("d MMM", Locale.US).format(new java.util.Date(w))
+                        + (NfcTap.games(this) ? " · with games" : ""));
         long at = NfcTap.lastAt(this);
         tapLast.setText(at == 0 ? "•  No taps yet"
                 : "•  Last tap " + android.text.format.DateFormat.getTimeFormat(this).format(new java.util.Date(at)) + " · " + NfcTap.lastDid(this));
@@ -3907,17 +3935,18 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         st.setPadding(0, dp(10), 0, dp(6));
         c.addView(st, new LinearLayout.LayoutParams(-1, -2));
         final boolean[] done = {false};
+        final String uri = NfcTap.tagUri(this);
         final Runnable close = sheet("Write the tag", "Puts Pulse's link on an NFC sticker or your watch's tag", c);
         tagSheet = close;
         try {
             nfc.enableReaderMode(this, tag -> {
                 if (done[0]) return;
                 if (menuClose != close) { ui.post(this::stopReader); return; }   // the sheet was closed
-                final String err = writeTag(tag);
+                final String err = writeTag(tag, uri);
                 ui.post(() -> {
                     if (err == null) {
                         done[0] = true;
-                        prefs().edit().putLong("tap_written", System.currentTimeMillis())
+                        prefs().edit().putLong("tap_written", System.currentTimeMillis()).putString("tap_written_uri", uri)
                                 .putString("tap_uid", hex(tag.getId())).apply();
                         swapText(st, "Done! Lift the watch, then tap it to try");
                         NfcTap.buzz(this);
@@ -3941,9 +3970,9 @@ public class MainActivity extends Activity implements WatchLink.Listener {
         try { android.nfc.NfcAdapter.getDefaultAdapter(this).disableReaderMode(this); } catch (Exception ignored) { }
     }
 
-    /** Puts pulse://tap on the tag; null if it worked, else why not. */
-    private static String writeTag(android.nfc.Tag tag) {
-        android.nfc.NdefMessage msg = new android.nfc.NdefMessage(android.nfc.NdefRecord.createUri(NfcTap.URI));
+    /** Puts the link (pulse://tap, or the game link) on the tag; null if it worked, else why not. */
+    private static String writeTag(android.nfc.Tag tag, String uri) {
+        android.nfc.NdefMessage msg = new android.nfc.NdefMessage(android.nfc.NdefRecord.createUri(uri));
         try {
             android.nfc.tech.Ndef nd = android.nfc.tech.Ndef.get(tag);
             if (nd != null) {

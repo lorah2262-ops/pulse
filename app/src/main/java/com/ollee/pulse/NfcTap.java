@@ -49,6 +49,51 @@ final class NfcTap {
         return first;
     }
 
+    // ---------- games: a friend's phone tapping the watch opens your game ----------
+
+    /** Whether the tag carries the game link (friends tap to join) instead of pulse://tap. */
+    static boolean games(Context c) { return p(c).getBoolean("tap_games", false); }
+
+    static void games(Context c, boolean on) { p(c).edit().putBoolean("tap_games", on).apply(); }
+
+    /** This phone's id under hosts/ in the game database: fixed, so the tag never needs rewriting. */
+    static String hostId(Context c) {
+        String h = p(c).getString("party_host", "");
+        if (h.isEmpty()) {
+            byte[] b = new byte[4];
+            new java.security.SecureRandom().nextBytes(b);
+            StringBuilder s = new StringBuilder();
+            for (byte x : b) s.append(String.format(java.util.Locale.US, "%02x", x));
+            h = s.toString();
+            p(c).edit().putString("party_host", h).apply();
+        }
+        return h;
+    }
+
+    /** Why the game link can't be used yet, or null when online play is set up. */
+    static String gamesProblem(Context c) {
+        if (!Party.dbUrl(c).startsWith("https://")) return "Add your Firebase link in Online play (Home) first";
+        if (!Party.pageUrl(c).startsWith("https://")) return "Add your game page link in Online play (Home) first";
+        return null;
+    }
+
+    /**
+     * What Write tag puts on the tag. With games on: the game page with the database (without https://,
+     * to fit small stickers) and this phone's id. Friends' phones open it in the browser and land in
+     * whatever game is on; this phone opens Pulse instead (TapActivity) and does the tap action.
+     */
+    static String tagUri(Context c) {
+        if (!games(c) || gamesProblem(c) != null) return URI;
+        String page = Party.pageUrl(c);
+        return page + (page.contains("?") ? "&" : "?") + "d=" + Party.dbUrl(c).substring(8) + "&h=" + hostId(c);
+    }
+
+    /** A tag link is this phone's own (pulse://tap, or a game link with our id). */
+    static boolean ours(Context c, android.net.Uri u) {
+        if (u == null || "pulse".equals(u.getScheme())) return true;
+        try { return hostId(c).equals(u.getQueryParameter("h")); } catch (Exception e) { return false; }
+    }
+
     static long lastAt(Context c) { return p(c).getLong("tap_at", 0); }
 
     static String lastDid(Context c) { return p(c).getString("tap_did", ""); }

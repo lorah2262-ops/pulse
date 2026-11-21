@@ -28,6 +28,7 @@ final class Online {
     private final Party party;
     private final String base;                 // https://xxx.firebaseio.com/games/CODE
     final String db;                           // https://xxx.firebaseio.com
+    private final String host;                 // db/hosts/ID: which game this phone has on (for the tag)
     private volatile boolean on = true;
     private final ExecutorService out = Executors.newSingleThreadExecutor();
     private final AtomicBoolean pending = new AtomicBoolean();
@@ -43,12 +44,15 @@ final class Online {
         if (d.endsWith(".json")) d = d.substring(0, d.length() - 5);
         this.db = d;
         base = d + "/games/" + party.code;
+        host = d + "/hosts/" + NfcTap.hostId(party.app);
     }
 
     void start() {
         out.execute(() -> {
             send("DELETE", base + ".json", null);
             send("PUT", base + "/meta.json", "{\"kind\":\"" + party.kind + "\",\"at\":" + System.currentTimeMillis() + "}");
+            // for the watch's tag: a friend's phone looks up the game that's on here
+            send("PUT", host + ".json", "{\"code\":\"" + party.code + "\",\"kind\":\"" + party.kind + "\",\"at\":" + System.currentTimeMillis() + "}");
         });
         Thread t = new Thread(this::listen, "online-in");
         t.setDaemon(true);
@@ -58,7 +62,10 @@ final class Online {
     void end() {
         on = false;
         try { if (stream != null) stream.disconnect(); } catch (Exception ignored) { }
-        out.execute(() -> send("DELETE", base + ".json", null));
+        out.execute(() -> {
+            send("DELETE", base + ".json", null);
+            send("DELETE", host + ".json", null);
+        });
         out.shutdown();
     }
 

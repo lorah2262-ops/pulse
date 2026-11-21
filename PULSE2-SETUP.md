@@ -167,3 +167,12 @@ Load the `Pulse.min.js` from this zip in Forge first: it now tells the app its v
 
 - **Presses**: the glow now sits under the words (they stay sharp), a pressed button rises above its neighbours instead of being cut by them, and the page holds still while your finger is on a button; drag clearly up or down and it lets go so you can scroll.
 - **Drain chart**: no swirl. Like the reference: rows shrink into their icons from the bottom up, the icons drift loose on smooth curves to their spots, then the bars rise beneath them and give them a small push.
+
+## 17. Tap the watch to join a game
+Friends hold their phone on your watch and land in your UNO or Buckshot game, with no app and no link to type (any phone with NFC, iPhone too).
+1. Set up **Online play** on Home first: your Firebase link and your game page on GitHub Pages (a `github.io` link).
+2. **Tap** tab → **GAMES** → turn on **Friends tap to join**.
+3. Tap **Write tag** once. The tag now holds your game page link with your phone's id, so it never needs writing again.
+4. Host a game (watch: hold A → PLAY, or Home → PLAY). It goes online by itself, and the watch lobby scrolls **OR tAP thE WAtCH**.
+
+Your own phone still does your Tap action when it reads the tag. If no game is on, a friend's phone says so.

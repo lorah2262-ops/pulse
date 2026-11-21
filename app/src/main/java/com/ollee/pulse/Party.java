@@ -53,7 +53,7 @@ final class Party {
     Game game;
     Online online;
     int version;
-    private final Context app;
+    final Context app;
     private ServerSocket server;
     private NsdManager.RegistrationListener nsd;
     private volatile boolean open = true;
@@ -144,7 +144,7 @@ final class Party {
     static Party hostSaved(Context c, String kind) {
         prefs(c).edit().putString("party_kind", kind).apply();
         Party p = host(c, kind);
-        if (p != null && wantOnline(c)) p.goOnline(dbUrl(c));
+        if (p != null && (wantOnline(c) || (NfcTap.games(c) && NfcTap.gamesProblem(c) == null))) p.goOnline(dbUrl(c));
         return p;
     }
 

@@ -288,8 +288,26 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var HEX = ['#ef4444', '#22c55e', '#3b82f6', '#facc15'];
-  var Q = new URLSearchParams(location.search), DB = (Q.get('db') || '').replace(/\/+$/, ''), GAME = Q.get('g') || '';
+  var Q = new URLSearchParams(location.search), GAME = Q.get('g') || '';
+  var DB = (Q.get('db') || (Q.get('d') ? 'https://' + Q.get('d') : '')).replace(/\/+$/, '');
   var ONLINE = !!(DB && GAME);
+  // tapped on a watch: the tag holds the host's id; find the game that's on there and go in
+  if (DB && !GAME && Q.get('h')) {
+    fetch(DB + '/hosts/' + encodeURIComponent(Q.get('h')) + '.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (m) {
+      if (m && m.code) { Q.set('g', m.code); location.replace(location.pathname + '?' + Q.toString()); return; }
+      noGame();
+    }).catch(noGame);
+    var waitEl = document.getElementById('joinTitle');
+    if (waitEl) { waitEl.textContent = 'Finding the game\u2026'; document.getElementById('joinSub').textContent = 'One moment.'; }
+    var jb = document.getElementById('joinBtn'); if (jb) jb.disabled = true;
+    return;
+  }
+  function noGame() {
+    ['join', 'lobby', 'game', 'buck', 'over', 'ended'].forEach(function (s) { var e = document.getElementById(s); if (e) e.classList.toggle('on', s === 'ended'); });
+    var e = document.getElementById('ended');
+    e.querySelector('h2').textContent = 'No game right now';
+    e.querySelector('p').textContent = 'Ask them to open PLAY on their watch, then tap it again.';
+  }
   var token = '', ver = -1, seq = -1, st = null, kind = '', busy = false;
   var queue = [], animating = false, es = null;
   var KEY = 'pulseToken' + (GAME || location.host);
