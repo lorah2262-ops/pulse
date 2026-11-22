@@ -55,7 +55,14 @@ Open an [issue](https://github.com/lorah2262-ops/pulse/issues) with what happene
 ---
 
 ## For developers
-- `app/` is the Android app: plain Java, no libraries.
-- `app/src/main/assets/Pulse.min.js` is the watch face the app ships and installs. Face changes are made to this file directly.
-- `app/src/main/assets/play.html` is the game page friends open in their browser.
+| Folder | What |
+|---|---|
+| `app/` | The Android app: plain Java, no libraries |
+| `watch/Pulse.min.js` | The watch face. The app carries an identical copy in `app/src/main/assets/`, and the build checks they match |
+| `watch/Pulse.js` | Readable face source (**older than Pulse.min.js**, see below) |
+| `watch/DayPack.*` | The Day pack events face |
+| `tools/` | `build-face.sh` (minify `watch/Pulse.js` and copy it into the app), `shrink.py`, and the Day pack test |
+| `app/src/main/assets/play.html` | The game page friends open in their browser |
+
 - Every push to `main` builds on GitHub (`.github/workflows/build.yml`) and publishes **Pulse.apk** and **Pulse.min.js** as the latest release. Each build gets a higher version number and the same signing key, so it installs over the previous one.
+- `watch/Pulse.js` is behind the shipped `Pulse.min.js`. Until the newest readable source is added, face changes are made to `Pulse.min.js` directly (both copies). Don't run `build-face.sh`, or it will replace the current face with the older one.
