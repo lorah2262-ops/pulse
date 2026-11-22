@@ -17,7 +17,8 @@ import java.nio.charset.StandardCharsets;
  *
  *   frame = [length, 2 bytes][AA 55][CRC-16/CCITT-FALSE of the rest, 2 bytes][02][cmd][body]
  *   0x39 ready?  0x3F slot -> version   0x3E slot+name   0x40 slot+version
- *   0x41 [00][seq 2][file length 2][200 bytes]... each answered by 0x61 [done][next seq 2]
+ *   0x41 [slot][seq 2][file length 2][200 bytes]... each answered by 0x61 [done][next seq 2]
+ *   (the Ollee app's log only shows slot 0 there; sending 0 always put every face in Forge A)
  *
  * Replies use cmd + 0x20. Forge C (slot 2) holds Pulse itself: only installPulse writes it,
  * for an update or repair the user confirmed.
@@ -339,7 +340,7 @@ public final class FaceInstall {
                     if (c3 != 0x5E) { finish(rep, "FAIL", "The watch didn't take the face name (" + code(c3) + ")"); return; }
                     ask(w, 0x40, new byte[]{(byte) slot, (byte) fMaj, (byte) fMin}, 5000, (c4, v4) -> {
                         if (c4 != 0x60) { finish(rep, "FAIL", "The watch didn't take the version (" + code(c4) + ")"); return; }
-                        chunk(w, js, 0, 0, -1, (wa, ap, over) -> {
+                        chunk(w, slot, js, 0, 0, -1, (wa, ap, over) -> {
                             if (over && ap.startsWith("Installed")) {
                                 remember(app, slot, name, fMaj + "." + fMin);
                                 Backups.save(app, name, fMaj + "." + fMin, js);
@@ -352,11 +353,12 @@ public final class FaceInstall {
         });
     }
 
-    private static void chunk(WatchLink w, byte[] js, int seq, int tries, int shown, Report rep, String done) {
+    private static void chunk(WatchLink w, int slot, byte[] js, int seq, int tries, int shown, Report rep, String done) {
         int count = (js.length + CHUNK - 1) / CHUNK;
         if (seq >= count) { finish(rep, "FAIL", "The watch never said the face was complete"); return; }
         int from = seq * CHUNK, n = Math.min(CHUNK, js.length - from);
         byte[] body = new byte[5 + n];
+        body[0] = (byte) slot;                              // which Forge slot the code goes to
         body[1] = (byte) (seq >> 8);
         body[2] = (byte) seq;
         body[3] = (byte) (js.length >> 8);
@@ -367,13 +369,13 @@ public final class FaceInstall {
         if (pct != shown) rep.step("SEnd " + pct, "Sending... " + pct + "%", false);
         ask(w, 0x41, body, 6000, (cmd, v) -> {
             if (cmd != 0x61 || v.length < 3) {
-                if (tries < 2) chunk(w, js, seq, tries + 1, now, rep, done);
+                if (tries < 2) chunk(w, slot, js, seq, tries + 1, now, rep, done);
                 else finish(rep, "FAIL", "The watch stopped answering at " + (seq * 100 / count) + "% (" + code(cmd) + ")");
                 return;
             }
             if (v[0] == 1) { finish(rep, "dOnE", "Installed: " + done); return; }
             int next = ((v[1] & 255) << 8) | (v[2] & 255);
-            chunk(w, js, next, 0, now, rep, done);
+            chunk(w, slot, js, next, 0, now, rep, done);
         });
     }
 
