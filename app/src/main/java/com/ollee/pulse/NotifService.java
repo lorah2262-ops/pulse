@@ -827,6 +827,8 @@ public class NotifService extends NotificationListenerService implements WatchLi
         Party.watchers.remove(partyWatch);
         Party.end();
         if (pill != null) pill.hide();
+        h.removeCallbacks(repick);
+        watchAll(null);
         if (link != null) link.setCommandHandler(null);
         net.shutdownNow();
         if (volReceiver) {
@@ -883,21 +885,72 @@ public class NotifService extends NotificationListenerService implements WatchLi
             return null;                                      // not open: its media button starts it
         }
         if (list == null || list.isEmpty()) return null;
-        MediaController last = null;
+        MediaController last = null, blank = null;
         for (MediaController c : list) {
+            String p = c.getPackageName();
+            if (NOT_PLAYERS.contains(p)) continue;
             PlaybackState s = c.getPlaybackState();
-            if (s != null && s.getState() == PlaybackState.STATE_PLAYING) {
-                lastPkg = c.getPackageName();
+            boolean playing = s != null && s.getState() == PlaybackState.STATE_PLAYING;
+            if (playing && hasSong(c)) {
+                lastPkg = p;
                 return c;
             }
-            if (last == null && c.getPackageName().equals(lastPkg)) last = c;
+            if (last == null && p.equals(lastPkg)) last = c;
+            if (playing && blank == null) blank = c;
         }
         if (last != null) return last;
-        return lastPkg == null ? list.get(0) : null;    // the last app's player is gone
+        // "playing" but says nothing yet: a player that's starting, or a volume-key helper.
+        // Watched, but not remembered as the music app until it names a song.
+        if (blank != null) return blank;
+        if (lastPkg != null) return null;                 // the last app's player is gone
+        for (MediaController c : list) if (!NOT_PLAYERS.contains(c.getPackageName()) && hasSong(c)) return c;
+        return null;
+    }
+
+    /**
+     * Apps that keep a "playing" media session that isn't music: volume-button helpers hold one
+     * while the screen is off so they can catch the volume keys.
+     */
+    private static final java.util.Set<String> NOT_PLAYERS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "app.maslanka.volumee"));
+
+    /** The session says what's playing (a title, an artist or a length), like real players do. */
+    private static boolean hasSong(MediaController c) {
+        MediaMetadata md;
+        try { md = c.getMetadata(); } catch (Exception e) { return false; }
+        if (md == null) return false;
+        String t = md.getString(MediaMetadata.METADATA_KEY_TITLE), a = md.getString(MediaMetadata.METADATA_KEY_ARTIST);
+        return (t != null && !t.trim().isEmpty()) || (a != null && !a.trim().isEmpty())
+                || md.getLong(MediaMetadata.METADATA_KEY_DURATION) > 0;
+    }
+
+    /** Every other player is watched too, so one that starts (or names its song) takes over. */
+    private final java.util.List<MediaController> watched = new java.util.ArrayList<>();
+    private final Runnable repick = () -> pickPlayer(null);
+    private final MediaController.Callback otherCb = new MediaController.Callback() {
+        @Override public void onPlaybackStateChanged(PlaybackState s) { h.removeCallbacks(repick); h.postDelayed(repick, 400); }
+        @Override public void onMetadataChanged(MediaMetadata m) { h.removeCallbacks(repick); h.postDelayed(repick, 400); }
+    };
+
+    private void watchAll(List<MediaController> list) {
+        if (list != null && list.size() == watched.size()) {       // same sessions as before: nothing to do
+            boolean same = true;
+            for (int i = 0; i < list.size() && same; i++) same = list.get(i).getSessionToken().equals(watched.get(i).getSessionToken());
+            if (same) return;
+        }
+        for (MediaController c : watched) try { c.unregisterCallback(otherCb); } catch (Exception ignored) { }
+        watched.clear();
+        if (list == null) return;
+        for (MediaController c : list) {
+            if (NOT_PLAYERS.contains(c.getPackageName())) { watched.add(c); continue; }   // kept for the comparison only
+            try { c.registerCallback(otherCb, h); watched.add(c); } catch (Exception ignored) { }
+        }
     }
 
     private void pickPlayer(List<MediaController> list) {
-        setPlayer(choose(list == null ? sessions() : list));
+        if (list == null) list = sessions();
+        watchAll(list);
+        setPlayer(choose(list));
         pushSoon();
     }
 
@@ -951,12 +1004,19 @@ public class NotifService extends NotificationListenerService implements WatchLi
             String title = md == null ? "" : Txt.clean(md.getString(MediaMetadata.METADATA_KEY_TITLE), 60);
             String artist = md == null ? "" : Txt.clean(md.getString(MediaMetadata.METADATA_KEY_ARTIST), 30);
             String t = artist.isEmpty() ? title : title.isEmpty() ? artist : artist + " - " + title;
-            if (t.isEmpty()) t = appName(ctl.getPackageName());
             t = Txt.clean(t, 70);
-            int bpm = playing ? bpmOf(t) : 0;
-            line = "M" + (playing ? 1 : 0) + "|" + Math.max(0, pos / 1000) + "|" + Math.max(0, dur / 1000) + "|" + t
-                    + (bpm > 0 ? "|" + bpm : "");
-            key = (playing ? 1 : 0) + "|" + dur + "|" + t + "|" + bpm;    // ignore position-only changes
+            if (t.isEmpty() && dur <= 0) {
+                // nothing named: not music (a volume-key helper's session, or a player still starting).
+                // The watch shows its clock instead of an app's package name.
+                line = "M0|0|0|";
+                key = line;
+            } else {
+                if (t.isEmpty()) t = appName(ctl.getPackageName());
+                int bpm = playing ? bpmOf(t) : 0;
+                line = "M" + (playing ? 1 : 0) + "|" + Math.max(0, pos / 1000) + "|" + Math.max(0, dur / 1000) + "|" + t
+                        + (bpm > 0 ? "|" + bpm : "");
+                key = (playing ? 1 : 0) + "|" + dur + "|" + t + "|" + bpm;    // ignore position-only changes
+            }
         }
         if (!link.isReady()) return;           // not sent = not remembered, so it goes out on reconnect
         // battery saver: while another watch face is showing, song changes stay on the phone.
