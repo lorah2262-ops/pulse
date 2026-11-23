@@ -29,7 +29,7 @@ public final class FaceInstall {
     public interface Report { void step(String watch, String app, boolean over); }
 
     static final int CHUNK = 200, MAX = 8158;
-    static final String[] SLOT = {"Forge A", "Forge B", "Forge C", "Forge D"};
+    static final String[] SLOT = {"Forge A", "Forge B", "Forge C", "Forge D", "Forge E"};
 
     private static final Handler h = new Handler(Looper.getMainLooper());
     private static boolean busy;
@@ -389,7 +389,7 @@ public final class FaceInstall {
 
     // ---------- reading the slots (nothing is written) ----------
 
-    /** Asks the watch for each slot's name and version, A to D. D only answers if the watch has one. */
+    /** Asks the watch for each slot's name and version, A to E. D and E only answer if the watch has them. */
     public static void slots(Context c, Report rep) {
         if (!start(c, rep)) return;
         rep.step("SLOtS", "Asking the watch about its Forge slots...", false);
@@ -400,7 +400,7 @@ public final class FaceInstall {
     private static Context slotCtx;
 
     private static void slotNext(WatchLink w, int i, StringBuilder app, StringBuilder watch, Report rep) {
-        if (i > 3) {
+        if (i > 4) {
             finish(rep, watch.toString().trim(), app.toString().trim());
             return;
         }
@@ -408,7 +408,7 @@ public final class FaceInstall {
             String letter = String.valueOf((char) ('A' + i));
             if (c1 != 0x5D) {
                 app.append(SLOT[i]).append(": ").append(c1 < 0 ? "no slot (no answer)" : "no slot (" + code(c1) + ")").append('\n');
-                if (i == 3) watch.append(" nO d");
+                if (i >= 3) watch.append(i == 3 ? " nO d" : " nO E");
                 slotNext(w, i + 1, app, watch, rep);
                 return;
             }
@@ -418,7 +418,7 @@ public final class FaceInstall {
                 String ver = c2 == 0x5F && v2.length >= 2 ? (v2[0] & 255) + "." + (v2[1] & 255) : "?";
                 app.append(SLOT[i]).append(": ").append(nm.isEmpty() ? "(empty)" : nm).append("  v").append(ver).append('\n');
                 if (slotCtx != null && i < 3) remember(slotCtx, i, nm, "?".equals(ver) ? null : ver);
-                watch.append(' ').append(letter).append(i == 3 ? " FOUNd" : "");
+                watch.append(' ').append(letter).append(i >= 3 ? " FOUNd" : "");
                 slotNext(w, i + 1, app, watch, rep);
             });
         });
