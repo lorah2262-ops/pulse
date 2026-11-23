@@ -34,6 +34,9 @@ public final class FaceInstall {
     private static final Handler h = new Handler(Looper.getMainLooper());
     private static boolean busy;
 
+    /** A face install is running. */
+    static boolean busy() { return busy; }
+
     private FaceInstall() { }
 
     public static boolean isBusy() { return busy; }
@@ -270,6 +273,7 @@ public final class FaceInstall {
         h.postDelayed(() -> {
             if (waitSeq == seq && waiting == r) {
                 waiting = null;
+                if (w.nusPiece() > 20) w.packetsFailed();   // no answer to a big frame: next try uses small ones
                 r.on(-1, new byte[0]);
             }
         }, ms);

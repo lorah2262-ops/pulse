@@ -55,7 +55,37 @@ public class WatchLink {
     private static final class Out {
         final int kind;
         final byte[] v;
+        boolean big;                     // longer than 20 bytes (only after the watch agreed to bigger packets)
         Out(int kind, byte[] v) { this.kind = kind; this.v = v; }
+    }
+
+    // Face installs: Android and the watch agree on bigger Bluetooth packets when they connect, so a
+    // whole install frame (about 210 bytes) goes in one write instead of eleven. If the watch ever
+    // refuses one, Pulse falls back to 20-byte writes and remembers that.
+    private int mtu = 23;
+    private boolean discovering;
+    private Out inFlight;
+
+    private boolean bigOk() {
+        return mtu > 23 && !ctx.getSharedPreferences("pulse", Context.MODE_PRIVATE).getBoolean("nus_small", false);
+    }
+
+    /** Bigger packets went wrong: use 20-byte writes from now on. */
+    public void packetsFailed() {
+        ctx.getSharedPreferences("pulse", Context.MODE_PRIVATE).edit().putBoolean("nus_small", true).apply();
+    }
+
+    /** Bytes per write on the Ollee channel right now (20, or more once the watch agreed). */
+    public int nusPiece() { return bigOk() ? Math.min(mtu - 3, 244) : 20; }
+
+    /** Lets Pulse try bigger packets again after they were turned off. */
+    public void resetPackets() {
+        ctx.getSharedPreferences("pulse", Context.MODE_PRIVATE).edit().remove("nus_small").apply();
+    }
+
+    /** The watch's Bluetooth address, or "" when not connected. */
+    public String address() {
+        try { return dev == null ? "" : dev.getAddress(); } catch (Exception e) { return ""; }
     }
 
     private static WatchLink inst;
@@ -157,7 +187,7 @@ public class WatchLink {
     /** The watch has the Ollee channel (for installing faces). */
     public boolean hasNus() { return ready && nusRx != null && nusTx != null; }
 
-    /** Sends one Ollee-channel frame in 20-byte writes; switches its replies on first if needed. */
+    /** Sends one Ollee-channel frame (in 20-byte writes, or bigger ones once agreed); switches its replies on first if needed. */
     public void nusWrite(final byte[] frame) {
         h.post(() -> {
             if (!hasNus()) return;
@@ -165,8 +195,12 @@ public class WatchLink {
                 nusOn = true;
                 queue.add(new Out(2, ENABLE));
             }
-            for (int i = 0; i < frame.length; i += 20)
-                queue.add(new Out(1, Arrays.copyOfRange(frame, i, Math.min(frame.length, i + 20))));
+            int n = nusPiece();
+            for (int i = 0; i < frame.length; i += n) {
+                Out o = new Out(1, Arrays.copyOfRange(frame, i, Math.min(frame.length, i + n)));
+                o.big = o.v.length > 20;
+                queue.add(o);
+            }
             h.removeCallbacks(relax);
             if (!boosted) priority(true);
             pump();
@@ -309,10 +343,17 @@ public class WatchLink {
                 if (g != gatt) return;
                 if (ns == BluetoothProfile.STATE_CONNECTED) {
                     status("Connected, setting up...");
+                    mtu = 23;
+                    discovering = false;
                     h.postDelayed(() -> {
-                        try { if (gatt == g) g.discoverServices(); } catch (SecurityException ignored) { }
+                        boolean asked = false;
+                        try { if (gatt == g) asked = g.requestMtu(247); } catch (SecurityException ignored) { }
+                        if (!asked) discover(g);
+                        else h.postDelayed(() -> discover(g), 2500);   // never wait long for its answer
                     }, 600);
                 } else if (ns == BluetoothProfile.STATE_DISCONNECTED) {
+                    if (inFlight != null && inFlight.big && FaceInstall.busy()) packetsFailed();   // dropped mid big write
+                    inFlight = null;
                     ready = false;
                     busy = false;
                     queue.clear();
@@ -380,8 +421,25 @@ public class WatchLink {
         }
 
         @Override
+        public void onMtuChanged(BluetoothGatt g, int m, int st) {
+            h.post(() -> {
+                if (g != gatt) return;
+                if (st == BluetoothGatt.GATT_SUCCESS && m > 23) mtu = m;
+                discover(g);
+            });
+        }
+
+        @Override
         public void onCharacteristicWrite(BluetoothGatt g, BluetoothGattCharacteristic c, int st) {
             h.post(() -> {
+                Out was = inFlight;
+                inFlight = null;
+                if (st != BluetoothGatt.GATT_SUCCESS && was != null && was.big) {
+                    // the watch refused the bigger write: send the same bytes again in 20-byte pieces
+                    packetsFailed();
+                    for (int i = was.v.length - (was.v.length - 1) % 20 - 1; i >= 0; i -= 20)
+                        queue.addFirst(new Out(1, Arrays.copyOfRange(was.v, i, Math.min(was.v.length, i + 20))));
+                }
                 busy = false;
                 pump();
                 if (boosted && queue.isEmpty()) {
@@ -442,6 +500,12 @@ public class WatchLink {
             h.postDelayed(this, 5000);
         }
     };
+
+    private void discover(BluetoothGatt g) {
+        if (discovering || g != gatt) return;
+        discovering = true;
+        try { g.discoverServices(); } catch (SecurityException ignored) { }
+    }
 
     private void becomeReady() {
         if (ready || gatt == null) return;
@@ -522,7 +586,7 @@ public class WatchLink {
         }
         if (busy) {
             lastTraffic = android.os.SystemClock.elapsedRealtime();
-            queue.poll();
+            inFlight = queue.poll();
             final int seq = ++writeSeq;
             h.postDelayed(() -> {             // never stall if a write reply goes missing
                 if (busy && writeSeq == seq) { busy = false; pump(); }
