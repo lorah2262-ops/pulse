@@ -281,6 +281,35 @@ public class WatchLink {
         });
     }
 
+    /** The phone's Bluetooth went off: Android doesn't always say the link dropped, so drop it here
+     *  (the status would otherwise still say connected). */
+    public void adapterOff() {
+        h.post(() -> {
+            stopScan();
+            h.removeCallbacks(keepAlive);
+            inFlight = null;
+            ready = false;
+            busy = false;
+            queue.clear();
+            rxChr = null;
+            dropNus();
+            if (gatt != null) {
+                try { gatt.close(); } catch (SecurityException ignored) { }
+                gatt = null;
+            }
+            status("Bluetooth is off");
+        });
+    }
+
+    /** The phone's Bluetooth is back on: reconnect if the link is wanted. */
+    public void adapterOn() {
+        h.post(() -> {
+            retries = 0;
+            if (wanted && !paused && gatt == null) connect();
+            else if (!wanted) status("Disconnected");
+        });
+    }
+
     // ---------- scanning (only if the watch isn't paired with the phone) ----------
 
     private final ScanCallback scanCb = new ScanCallback() {

@@ -176,6 +176,22 @@ public class NotifService extends NotificationListenerService implements WatchLi
     private AudioManager audio;
     private String lastVol = "";
     private boolean volReceiver;
+    private boolean btReceiver;
+
+    /** The phone's Bluetooth switched off or on. */
+    private final BroadcastReceiver btState = new BroadcastReceiver() {
+        @Override public void onReceive(Context c, Intent i) {
+            int st = i.getIntExtra(android.bluetooth.BluetoothAdapter.EXTRA_STATE, -1);
+            WatchLink w = WatchLink.get(NotifService.this);
+            if (st == android.bluetooth.BluetoothAdapter.STATE_TURNING_OFF || st == android.bluetooth.BluetoothAdapter.STATE_OFF) {
+                w.adapterOff();
+            } else if (st == android.bluetooth.BluetoothAdapter.STATE_ON) {
+                h.postDelayed(() -> {
+                    w.adapterOn();
+                }, 1500);                            // give the Bluetooth stack a moment
+            }
+        }
+    };
     private final Runnable volNow = () -> pushVolume(false, true);
 
     // ---------- screens, YouTube, macros ----------
@@ -795,6 +811,12 @@ public class NotifService extends NotificationListenerService implements WatchLi
             else registerReceiver(showMsg, f);
             showReceiver = true;
         }
+        if (!btReceiver) {
+            IntentFilter f = new IntentFilter(android.bluetooth.BluetoothAdapter.ACTION_STATE_CHANGED);
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(btState, f, Context.RECEIVER_EXPORTED);
+            else registerReceiver(btState, f);
+            btReceiver = true;
+        }
     }
 
     @Override
@@ -838,6 +860,10 @@ public class NotifService extends NotificationListenerService implements WatchLi
         if (showReceiver) {
             try { unregisterReceiver(showMsg); } catch (Exception ignored) { }
             showReceiver = false;
+        }
+        if (btReceiver) {
+            try { unregisterReceiver(btState); } catch (Exception ignored) { }
+            btReceiver = false;
         }
         if (tickReceiver) {
             try { unregisterReceiver(nightTick); } catch (Exception ignored) { }
