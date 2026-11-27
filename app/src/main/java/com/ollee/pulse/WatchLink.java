@@ -157,6 +157,7 @@ public class WatchLink {
             paused = true;
             stopScan();
             h.removeCallbacks(keepAlive);
+            disarmWake();
             ready = false;
             busy = false;
             queue.clear();
@@ -266,6 +267,7 @@ public class WatchLink {
             save();
             stopScan();
             h.removeCallbacks(keepAlive);
+            disarmWake();
             ready = false;
             busy = false;
             queue.clear();
@@ -287,6 +289,7 @@ public class WatchLink {
         h.post(() -> {
             stopScan();
             h.removeCallbacks(keepAlive);
+            disarmWake();
             inFlight = null;
             ready = false;
             busy = false;
@@ -389,6 +392,7 @@ public class WatchLink {
                     rxChr = null;
                     dropNus();
                     h.removeCallbacks(keepAlive);
+                    disarmWake();
                     try { g.close(); } catch (SecurityException ignored) { }
                     gatt = null;
                     if (wanted) {
@@ -530,6 +534,65 @@ public class WatchLink {
         }
     };
 
+    // ---------- the keep-alive while the phone sleeps ----------
+    // The watch drops a phone that has been silent for 3 minutes (Ollee firmware; a write from the
+    // phone resets that timer). The Handler above stops while the phone sleeps, so an alarm wakes the
+    // phone every 2 minutes while linked and sends the same tiny line if nothing else went out.
+
+    static final long WAKE_EVERY = 120000;
+
+    /** The alarm's receiver (in the manifest). */
+    public static final class Wake extends android.content.BroadcastReceiver {
+        @Override
+        public void onReceive(Context c, android.content.Intent i) {
+            WatchLink w = inst;
+            if (w != null) w.wakeTick();
+        }
+    }
+
+    private android.app.PendingIntent wakeIntent() {
+        android.content.Intent i = new android.content.Intent(ctx, Wake.class);
+        return android.app.PendingIntent.getBroadcast(ctx, 7, i,
+                android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    private void armWake() {
+        android.app.AlarmManager am = (android.app.AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        long at = android.os.SystemClock.elapsedRealtime() + WAKE_EVERY;
+        int type = android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP;
+        try {
+            if (android.os.Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms())
+                am.setExactAndAllowWhileIdle(type, at, wakeIntent());
+            else am.setAndAllowWhileIdle(type, at, wakeIntent());
+        } catch (SecurityException e) {
+            try { am.setAndAllowWhileIdle(type, at, wakeIntent()); } catch (Exception ignored) { }
+        }
+    }
+
+    private void disarmWake() {
+        android.app.AlarmManager am = (android.app.AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        if (am != null) am.cancel(wakeIntent());
+    }
+
+    /**
+     * The alarm went off (on the main thread, inside the alarm's own wake time: done right here, since
+     * the phone may sleep again before a posted task runs): a line if the link has been quiet for a
+     * minute, then the next alarm.
+     */
+    private void wakeTick() {
+        if (!ready) return;
+        long quiet = android.os.SystemClock.elapsedRealtime() - lastTraffic;
+        if (quiet >= 60000 && !busy) {
+            if (queue.isEmpty()) {
+                queue.add(new Out(0, new byte[]{'\n'}));
+                History.sent(ctx, "", faceOn);
+            }
+            pump();
+        }
+        armWake();
+    }
+
     private void discover(BluetoothGatt g) {
         if (discovering || g != gatt) return;
         discovering = true;
@@ -543,6 +606,7 @@ public class WatchLink {
         lastTraffic = android.os.SystemClock.elapsedRealtime();
         h.removeCallbacks(keepAlive);
         h.postDelayed(keepAlive, 5000);
+        armWake();
         String n = "the watch";
         try { if (dev != null && dev.getName() != null) n = dev.getName(); } catch (SecurityException ignored) { }
         status("Connected to " + n);
