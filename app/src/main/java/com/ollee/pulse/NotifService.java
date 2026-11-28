@@ -1499,6 +1499,7 @@ public class NotifService extends NotificationListenerService implements WatchLi
         pickPlayer(null);
         h.postDelayed(() -> pushMedia(true), 400);
         h.postDelayed(() -> pushVolume(false, false), 700);
+        h.postDelayed(this::sendMissed, 2500);     // notifications that came while the link was down
         // The face says hello (H) 1.5 s after it sees the link, which can be before this side is
         // listening. Ask: a face that is showing answers with another H.
         h.postDelayed(() -> {
@@ -1523,9 +1524,12 @@ public class NotifService extends NotificationListenerService implements WatchLi
                 lastNav = "navigation seen, but the watch isn't connected";
             }
         }
-        if (link == null || !link.isReady()) return;
+        // not linked right now (the watch is reconnecting, or Bluetooth hiccuped): ordinary
+        // notifications are kept a few minutes and sent when the link is back (sendMissed)
+        final boolean live = link != null && link.isReady();
         // Google Maps while navigating: an ongoing notification that turns into the next turn
         if (isNav(pkg, n)) {
+            if (!live) return;
             if (face != null && Features.on(this, Features.NAV)) nav(n);
             else lastNav = "Turn-by-turn is switched off in FEATURES";
             return;
@@ -1537,7 +1541,7 @@ public class NotifService extends NotificationListenerService implements WatchLi
         // calls: only INCOMING ringing calls. Wait a moment so the phone's audio mode has
         // settled: an outgoing or answered call is "in call", a ringing one is not.
         if (Notification.CATEGORY_CALL.equals(n.category)) {
-            if (!Features.on(this, Features.CALLS)) return;
+            if (!live || !Features.on(this, Features.CALLS)) return;
             final String key = sbn.getKey();
             final boolean fullScreen = n.fullScreenIntent != null;
             final String caller = Txt.clean(title.isEmpty() ? text : title, 30);
@@ -1587,6 +1591,11 @@ public class NotifService extends NotificationListenerService implements WatchLi
         if (!Rules.pass(this, pkg, who, text, inGroup)) return;      // keyword rules
         if (isRepeat(tag + "|" + who + "|" + text)) return;
         if (face == null) return;
+        if (!live) {
+            missed.addLast(new Object[]{new Face.Note(Txt.seg(tag), Txt.seg(who), Txt.seg(text)), SystemClock.elapsedRealtime()});
+            while (missed.size() > MISSED_MAX) missed.removeFirst();
+            return;
+        }
         Drain.note(this);
         long wait = Saver.batchMs(this);
         if (wait <= 0) {
@@ -1597,6 +1606,26 @@ public class NotifService extends NotificationListenerService implements WatchLi
         batch.add(new Face.Note(Txt.seg(tag), Txt.seg(who), Txt.seg(text)));
         if (batch.size() == 1) h.postDelayed(flushBatch, wait);
         else if (batch.size() >= 10) flushBatch();
+    }
+
+    /** Notifications that came while the link was down, newest MISSED_MAX, for MISSED_MS. */
+    private final java.util.ArrayDeque<Object[]> missed = new java.util.ArrayDeque<>();
+    private static final int MISSED_MAX = 6;
+    private static final long MISSED_MS = 10 * 60000;
+
+    /** The link is back: what came meanwhile goes out, oldest first (night hours' ones are too old by then). */
+    private void sendMissed() {
+        if (face == null || link == null || !link.isReady() || missed.isEmpty()) return;
+        long now = SystemClock.elapsedRealtime();
+        List<Face.Note> out = new ArrayList<>();
+        while (!missed.isEmpty()) {
+            Object[] m = missed.removeFirst();
+            if (now - (Long) m[1] <= MISSED_MS) out.add((Face.Note) m[0]);
+        }
+        if (out.isEmpty()) return;
+        Drain.note(this);
+        if (out.size() == 1) face.onNotification(out.get(0).app, out.get(0).who, out.get(0).text);
+        else face.onBatch(out);
     }
 
     private void checkCall(String key, boolean fullScreen, String caller) {
